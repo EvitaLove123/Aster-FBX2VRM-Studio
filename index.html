@@ -224,9 +224,15 @@ function setupAsterWizard() {
   const progressFill = document.createElement('span');
   progress.appendChild(progressFill);
 
+  const previewCard = document.createElement('section');
+  previewCard.className = 'card preview-card';
+  previewCard.innerHTML = '<div class="wizard-step-kicker">LIVE PREVIEW</div><h2>3D Model Preview</h2><p class="note">The preview stays available while moving between conversion steps.</p>';
+  const modelViewport = $('viewport');
+  if (modelViewport) previewCard.appendChild(modelViewport);
+
   const poseCard = document.createElement('section');
   poseCard.className = 'card';
-  poseCard.innerHTML = '<div class="wizard-step-kicker">STEP 02</div><h2>Pose & camera controls</h2><p class="pose-intro">Use the available pose tools to prepare the model. Auto T-pose is experimental; inspect the result in the 3D preview before continuing. Camera controls do not modify the model.</p><div id="poseActions" class="toolbar"></div>';
+  poseCard.innerHTML = '<div class="wizard-step-kicker">STEP 02</div><h2>Pose & camera controls</h2><p class="pose-intro">Use the available pose tools to prepare the model. Auto T-pose is experimental; inspect the result in the 3D preview above. Camera controls do not modify the model.</p><div id="poseActions" class="toolbar"></div>';
 
   const poseButtons = ['resetCamera','autoTPose','resetPose','showAxes'];
   for (const id of poseButtons) {
@@ -276,7 +282,7 @@ function setupAsterWizard() {
     panel.appendChild(footer);
   });
 
-  hero.after(nav, progress, ...panels);
+  hero.after(nav, progress, previewCard, ...panels);
   window.asterShowWizardStep = showWizardStep;
   showWizardStep(0);
 
