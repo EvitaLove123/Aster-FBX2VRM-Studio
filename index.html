@@ -357,7 +357,7 @@ function autoMapBones(){
  $('mappingStatus').textContent='Auto-mapped '+mapped+' / '+humanoidSlots.length+' humanoid slots. Please review possible false matches and manually select missing bones.';
 }
 function populateMaterials(){
- materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
+ materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,originalMaterial:m,slot:i,isArray:Array.isArray(o.material),label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
  $('materialSelect').innerHTML=materialList.length?materialList.map((x,i)=>'<option value="'+i+'">'+x.label+'</option>').join(''):'<option value="">No materials</option>';
  if(materialList.length) loadMaterialControls();
 }
@@ -378,10 +378,19 @@ $('applyMaterial').addEventListener('click',()=>{
  m.opacity=Math.max(0,Math.min(1,Number($('matOpacity').value)||0));
  if(mode==='opaque'){m.transparent=false;m.opacity=1;m.alphaTest=0;}
  m.depthWrite=mode!=='blend';m.side=$('matSide').value==='front'?THREE.FrontSide:$('matSide').value==='back'?THREE.BackSide:THREE.DoubleSide;
- m.userData.asterUnlit=$('unlitToggle').checked;
- if('emissive' in m){if(m.userData.asterUnlit){m.emissive.set(m.color||0xffffff);m.emissiveIntensity=1;}else{m.emissive.set(0x000000);m.emissiveIntensity=0;}}
- m.needsUpdate=true;
- status('Material preview updated. Unlit is an emissive approximation until VRM export.', 'good');
+ const wantsUnlit=$('unlitToggle').checked;
+ if(wantsUnlit && !(m instanceof THREE.MeshBasicMaterial)){
+  const basic=new THREE.MeshBasicMaterial({name:m.name+' (Unlit preview)',color:m.color?m.color.clone():0xffffff,map:m.map||null,alphaMap:m.alphaMap||null,transparent:m.transparent,opacity:m.opacity,alphaTest:m.alphaTest,side:m.side,depthWrite:m.depthWrite});
+  basic.userData.asterOriginalMaterial=m;
+  e.material=basic;
+  if(e.isArray){const arr=e.mesh.material.slice();arr[e.slot]=basic;e.mesh.material=arr;}else e.mesh.material=basic;
+ }else if(!wantsUnlit && m instanceof THREE.MeshBasicMaterial && m.userData.asterOriginalMaterial){
+  const original=m.userData.asterOriginalMaterial;
+  original.color.set($('matColor').value);original.opacity=m.opacity;original.transparent=m.transparent;original.alphaTest=m.alphaTest;original.side=m.side;original.depthWrite=m.depthWrite;original.needsUpdate=true;
+  e.material=original;
+  if(e.isArray){const arr=e.mesh.material.slice();arr[e.slot]=original;e.mesh.material=arr;}else e.mesh.material=original;
+ }else{m.needsUpdate=true;}
+ status('Material preview updated.', 'good');
 });
 $('autoMap').addEventListener('click',autoMapBones);
 $('clearMap').addEventListener('click',()=>{humanoidMapping={};populateBoneTools();$('mappingStatus').textContent='All mapping assignments cleared.';});
