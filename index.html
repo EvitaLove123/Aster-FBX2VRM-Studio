@@ -616,36 +616,44 @@ function slotFingerInfo(slot){
  const m=slot.match(/^(left|right)(thumb|index|middle|ring|little)(proximal|intermediate|distal)$/i);
  return m?{side:m[1].toLowerCase(),finger:m[2].toLowerCase(),segment:m[3].toLowerCase()}:null;
 }
-function fingerScore(name,slot){
+function fingerScore(bone,slot){
  const info=slotFingerInfo(slot); if(!info)return 0;
- const raw=String(name||'').toLowerCase();
- const n=normBone(raw);
- const fingerAliases={thumb:['thumb','pollex'],index:['index','forefinger'],middle:['middle'],ring:['ring'],little:['little','pinky','pinkie']};
- if(!fingerAliases[info.finger].some(x=>n.includes(x)))return 0;
- const left=/(left|_l\b|\.l\b|-l\b|^l(?=[a-z])|l[0-9]$)/i.test(raw)||/l$/i.test(n);
- const right=/(right|_r\b|\.r\b|-r\b|^r(?=[a-z])|r[0-9]$)/i.test(raw)||/r$/i.test(n);
+ const raw=String(bone.name||'').toLowerCase();
+ const path=[];let parent=bone;
+ while(parent){if(parent.name)path.unshift(String(parent.name).toLowerCase());parent=parent.parent;}
+ const context=path.join('/');
+ const normalizedContext=normBone(context.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)));
+ const normalizedBone=normBone(raw.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)));
+ const fingerAliases={
+  thumb:['thumb','pollex','親指'],
+  index:['index','forefinger','人差し指','人指'],
+  middle:['middle','中指'],
+  ring:['ring','薬指'],
+  little:['little','pinky','pinkie','小指']
+ };
+ if(!fingerAliases[info.finger].some(x=>context.includes(x)||normalizedContext.includes(normBone(x))))return 0;
+ const left=/(left|左|_l\b|\.l\b|-l\b|^l(?=[a-z])|l[0-9]$)/i.test(context)||/(^|[^a-z])l([^a-z]|$)/i.test(context);
+ const right=/(right|右|_r\b|\.r\b|-r\b|^r(?=[a-z])|r[0-9]$)/i.test(context)||/(^|[^a-z])r([^a-z]|$)/i.test(context);
  if(info.side==='left'&&right&&!left)return 0;
  if(info.side==='right'&&left&&!right)return 0;
- if(!left&&!right){
-  const sideMarker=info.side==='left'?/(^|[^a-z])l([^a-z]|$)/i.test(raw):/(^|[^a-z])r([^a-z]|$)/i.test(raw);
-  if(!sideMarker)return 0;
- }
+ if(!left&&!right)return 0;
  const segmentMarkers={
-  proximal:['proximal','proxim','base','01','1'],
-  intermediate:['intermediate','intermed','medial','middle','02','2'],
-  distal:['distal','tip','03','3']
+  proximal:['proximal','proxim','base','01','1','０１','１'],
+  intermediate:['intermediate','intermed','medial','middle','02','2','０２','２'],
+  distal:['distal','tip','03','3','０３','３']
  }[info.segment];
- if(!segmentMarkers.some(x=>n.includes(x)))return 0;
+ if(!segmentMarkers.some(x=>normalizedBone.includes(normBone(x))||raw.includes(x)))return 0;
  let score=82;
- if(n.includes(info.segment))score+=12;
- if(n.includes(info.side))score+=3;
- if(/hand/.test(n))score+=2;
+ if(normalizedBone.includes(normBone(info.segment)))score+=12;
+ if(context.includes(info.side))score+=3;
+ if(/hand|手/.test(context))score+=2;
+ if(normalizedBone.includes('finger'))score+=1;
  return score;
 }
 function boneScore(bone,slot,aliases){
  const name=String(bone.name||'');
  const n=normBone(name);
- const finger=fingerScore(name,slot);
+ const finger=fingerScore(bone,slot);
  if(finger)return finger;
  let best=0;
  for(const alias of aliases){
