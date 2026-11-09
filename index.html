@@ -79,7 +79,57 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <p class="note" id="details">No FBX has been parsed yet.</p>
 </section>
 <section class="card">
-<h2>3. Prototype status</h2>
+<h2>3. Humanoid & finger mapping</h2>
+<p class="note">Map bones before exporting. VRM export requires the core humanoid bones; review Auto-Mapping before downloading.</p>
+<div class="toolbar"><button id="autoMap" type="button" disabled>Auto-map humanoid + fingers</button><button id="clearMap" class="secondary" type="button" disabled>Clear mapping</button></div>
+<div id="mappingStatus" class="sectionhint">Load an FBX model to detect bones.</div>
+<div id="boneMappingGrid" class="formgrid" style="margin-top:12px"></div>
+<div class="formfield" style="margin-top:12px"><label for="customBoneSelect">Inspect another bone</label><select id="customBoneSelect"><option value="">Load a model first…</option></select></div>
+</section>
+<section class="card">
+<h2>4. Material editor</h2>
+<p class="note">Preview-only material controls. These settings are exported only where the GLTF exporter can represent them; VRM-specific MToon properties are not yet authored.</p>
+<div class="formgrid">
+<div class="formfield"><label for="materialSelect">Mesh / material</label><select id="materialSelect"><option value="">No materials</option></select></div>
+<div class="formfield"><label for="alphaMode">Rendering mode</label><select id="alphaMode"><option value="opaque">Opaque</option><option value="mask">Alpha Mask</option><option value="blend">Alpha Blend</option></select></div>
+<div class="formfield"><label for="matColor">Base color</label><input id="matColor" type="color" value="#ffffff" style="width:100%;height:42px"></div>
+<div class="formfield"><label for="matOpacity">Opacity (0–1)</label><input id="matOpacity" type="number" min="0" max="1" step="0.05" value="1"></div>
+<div class="formfield"><label for="alphaCutoff">Alpha cutoff</label><input id="alphaCutoff" type="number" min="0" max="1" step="0.05" value="0.5"></div>
+<div class="formfield"><label for="matSide">Face rendering</label><select id="matSide"><option value="double">Double-sided</option><option value="front">Front-sided</option><option value="back">Back-sided</option></select></div>
+</div>
+<label class="checkrow"><input id="unlitToggle" type="checkbox"> Unlit preview</label>
+<button id="applyMaterial" type="button">Apply material preview</button>
+</section>
+<section class="card">
+<h2>5. VRM metadata</h2>
+<p class="note">Model name and author are required for both export formats. Choose permissions carefully; they are written into the exported VRM metadata.</p>
+<div class="formgrid">
+<div class="formfield"><label for="metaName">Model name *</label><input id="metaName" type="text" placeholder="Model name"></div>
+<div class="formfield"><label for="metaAuthor">Author *</label><input id="metaAuthor" type="text" placeholder="Creator name"></div>
+<div class="formfield"><label for="metaVersion">Version</label><input id="metaVersion" type="text" value="1.0"></div>
+<div class="formfield"><label for="metaContact">Contact information</label><input id="metaContact" type="text" placeholder="Optional"></div>
+<div class="formfield"><label for="metaReference">Reference URL</label><input id="metaReference" type="text" placeholder="Optional"></div>
+<div class="formfield"><label for="metaLicense">Allowed user</label><select id="metaLicense"><option value="Everyone">Everyone</option><option value="OnlyAuthor">Only Author</option><option value="ExplicitlyLicensedPerson">Explicitly Licensed Person</option></select></div>
+<div class="formfield"><label for="metaPermission">Violent usage</label><select id="metaPermission"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
+<div class="formfield"><label for="metaSexual">Sexual usage</label><select id="metaSexual"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
+<div class="formfield"><label for="metaCommercial">Commercial usage (VRM 0.x)</label><select id="metaCommercial"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
+<div class="formfield"><label for="metaRedistribution">License preset</label><select id="metaRedistribution"><option value="Redistribution_Prohibited">Redistribution prohibited</option><option value="CC0">CC0</option><option value="CC_BY">CC BY</option><option value="CC_BY_NC">CC BY-NC</option><option value="CC_BY_SA">CC BY-SA</option><option value="CC_BY_NC_SA">CC BY-NC-SA</option><option value="CC_BY_ND">CC BY-ND</option><option value="CC_BY_NC_ND">CC BY-NC-ND</option><option value="Other">Other</option></select></div>
+<div class="formfield"><label for="metaLicenseName">License name</label><select id="metaLicenseName"><option value="Redistribution_Prohibited">Redistribution_Prohibited</option><option value="CC0">CC0</option><option value="CC_BY">CC_BY</option><option value="CC_BY_NC">CC_BY_NC</option><option value="CC_BY_SA">CC_BY_SA</option><option value="CC_BY_NC_SA">CC_BY_NC_SA</option><option value="CC_BY_ND">CC_BY_ND</option><option value="CC_BY_NC_ND">CC_BY_NC_ND</option><option value="Other">Other</option></select></div>
+<div class="formfield"><label for="metaOther">Other license / permission URL</label><input id="metaOther" type="text" placeholder="https://…"></div>
+</div>
+<button id="exportMeta" class="secondary" type="button">Download metadata JSON</button>
+</section>
+<section class="card">
+<h2>6. VRM export</h2>
+<p class="note">Exports a binary GLB container with VRM extension data and the .vrm file extension. Core humanoid mapping is required. Advanced features such as MToon authoring, expressions, first-person mesh annotations, SpringBone and colliders are not yet included.</p>
+<div class="toolbar">
+<button id="exportVRM0" type="button" disabled>Download VRM 0.x</button>
+<button id="exportVRM1" type="button" disabled>Download VRM 1.0</button>
+</div>
+<div id="exportStatus" class="sectionhint">Load a model and complete required humanoid mapping to export.</div>
+</section>
+<section class="card">
+<h2>7. Prototype status</h2>
 <ul>
 <li>FBX file selection and local ArrayBuffer parsing</li>
 <li>External image selection with filename-based URL matching, including reloading after textures are added</li>
@@ -89,13 +139,14 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <li>Orbit, zoom, pan, automatic framing, and camera reset</li>
 <li>Basic mesh, material, and skeleton inspection</li>
 </ul>
-<p class="note">This prototype is an FBX importer and viewer, not yet a VRM converter. Humanoid mapping, pose editing, skin-weight tools, expressions, SpringBone/colliders, and VRM exporters are later stages.</p>
+<p class="note">This is an early FBX-to-VRM exporter. It writes a GLB binary with a VRM 0.x or VRM 1.0 core extension, based on the mapped humanoid skeleton. Advanced VRM features are not yet included; validate each exported model in a VRM validator and target app.</p>
 </section>
 </main>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 
 const $ = id => document.getElementById(id);
 const viewport = $('viewport');
@@ -284,6 +335,10 @@ async function loadFbxBuffer(buffer, fileName) {
     $('materialCount').textContent = String(materials);
     $('boneCount').textContent = String(bones);
     $('details').textContent = 'FBX parsed. ' + skinnedMeshes + ' skinned mesh(es) detected. Mesh frustum culling is disabled for preview; materials are double-sided. Source geometry and skin weights are not edited.';
+    populateBoneTools();
+    populateMaterials();
+    $('exportVRM0').disabled = false;
+    $('exportVRM1').disabled = false;
     $('empty').style.display = 'none';
     $('resetCamera').disabled = false;
     $('autoTPose').disabled = bones === 0;
@@ -292,6 +347,8 @@ async function loadFbxBuffer(buffer, fileName) {
   } catch (error) {
     console.error(error);
     const message = error && error.message ? error.message : String(error);
+    $('exportVRM0').disabled = true;
+    $('exportVRM1').disabled = true;
     status('FBX load failed: ' + message.slice(0, 110), 'bad');
     $('details').textContent = 'Could not parse this FBX: ' + message;
     $('empty').style.display = 'grid';
@@ -305,8 +362,17 @@ $('fbxFile').addEventListener('change', async event => {
     return;
   }
   lastFbxName = file.name;
-  lastFbxBuffer = await file.arrayBuffer();
-  await loadFbxBuffer(lastFbxBuffer, lastFbxName);
+  status('Reading ' + file.name + '…');
+  try {
+    lastFbxBuffer = await file.arrayBuffer();
+    await loadFbxBuffer(lastFbxBuffer, lastFbxName);
+  } catch (error) {
+    console.error(error);
+    status('Could not read FBX: ' + (error.message || error), 'bad');
+    $('details').textContent = 'File read failed. Try selecting the FBX again or use a smaller/local FBX file.';
+  } finally {
+    event.target.value = '';
+  }
 });
 
 const humanoidSlots = [
@@ -324,7 +390,7 @@ const fingerNames=['Thumb','Index','Middle','Ring','Little'];
 for(const side of ['Left','Right']) for(const finger of fingerNames) for(let seg=1;seg<=3;seg++){
  const slot=side.toLowerCase()+finger+(['Proximal','Intermediate','Distal'][seg-1]);
  const aliases=[side+finger+(seg===1?'Proximal':seg===2?'Intermediate':'Distal'),side+finger+seg,side[0].toLowerCase()+finger+seg];
- humanoidSlots.push([slot.toLowerCase(),aliases]);
+ humanoidSlots.push([slot,aliases]);
 }
 function normBone(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 function populateBoneTools(){
@@ -399,7 +465,140 @@ $('exportMeta').addEventListener('click',()=>{
  const data={name:$('metaName').value,author:$('metaAuthor').value,version:$('metaVersion').value,contactInformation:$('metaContact').value,reference:$('metaReference').value,allowedUser:$('metaLicense').value,violentUsage:$('metaPermission').value,sexualUsage:$('metaSexual').value,commercialUsage:$('metaCommercial').value,redistribution:$('metaRedistribution').value,licenseName:$('metaLicenseName').value,otherLicenseUrl:$('metaOther').value};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(data.name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_metadata.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
-\nfunction findBoneByAliases(model, aliases) {
+\n
+function getExportMeta() {
+  const value = id => String($(id)?.value || '').trim();
+  const name = value('metaName'), author = value('metaAuthor');
+  if (!name || !author) throw new Error('Please enter both Model name and Author in the VRM metadata section.');
+  return {name,author,version:value('metaVersion')||'1.0',contact:value('metaContact'),reference:value('metaReference'),allowed:value('metaLicense'),violent:value('metaPermission'),sexual:value('metaSexual'),commercial:value('metaCommercial'),license:value('metaLicenseName')||value('metaRedistribution'),other:value('metaOther')};
+}
+const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+function buildNodeIndexMap(gltfJson) {
+  const byName = new Map();
+  (gltfJson.nodes || []).forEach((node,index) => {
+    if (!node.name) return;
+    if (!byName.has(node.name)) byName.set(node.name,[]);
+    byName.get(node.name).push(index);
+  });
+  const used = new Set(), result = new Map();
+  for (const bone of boneList) {
+    const candidates = byName.get(bone.name) || [];
+    const idx = candidates.find(i => !used.has(i));
+    if (idx !== undefined) { result.set(bone,idx); used.add(idx); }
+  }
+  return result;
+}
+function buildHumanoid(version, nodeMap) {
+  const mapped = {};
+  for (const [slot,indexText] of Object.entries(humanoidMapping)) {
+    if (indexText === '' || indexText == null) continue;
+    const bone = boneList[Number(indexText)];
+    if (!bone) continue;
+    const node = nodeMap.get(bone);
+    if (node === undefined) throw new Error('Could not find exported glTF node for mapped bone: '+bone.name+'. Check for duplicate or empty bone names.');
+    mapped[slot] = node;
+  }
+  const missing = requiredHumanoidBones.filter(name => mapped[name] === undefined);
+  if (missing.length) throw new Error('Required humanoid bones are missing: '+missing.join(', ')+'. Complete the mapping first.');
+  const nodeValues = Object.values(mapped);
+  if (new Set(nodeValues).size !== nodeValues.length) throw new Error('The same bone is assigned to more than one humanoid slot. Correct the mapping.');
+  if (version === '0') {
+    return {humanBones:Object.entries(mapped).map(([bone,node])=>({bone,node,useDefaultValues:true})),armStretch:0.05,legStretch:0.05,upperArmTwist:0.5,lowerArmTwist:0.5,upperLegTwist:0.5,lowerLegTwist:0.5,feetSpacing:0,hasTranslationDoF:false};
+  }
+  const humanBones = {};
+  for (const [bone,node] of Object.entries(mapped)) humanBones[bone] = {node};
+  return {humanBones};
+}
+function glbWithVRMExtension(arrayBuffer, extensionName, extensionValue) {
+  const view = new DataView(arrayBuffer);
+  if (view.getUint32(0,true)!==0x46546c67 || view.getUint32(4,true)!==2) throw new Error('GLTFExporter did not return a valid GLB 2.0 binary.');
+  const total = view.getUint32(8,true);
+  let offset=12, json=null, binaryChunks=[];
+  while(offset<total){
+    const length=view.getUint32(offset,true), type=view.getUint32(offset+4,true), start=offset+8;
+    if(type===0x4e4f534a){
+      const bytes=new Uint8Array(arrayBuffer,start,length);
+      json=JSON.parse(new TextDecoder().decode(bytes).replace(/\u0000+$/g,'').trim());
+    }else{
+      binaryChunks.push({type,bytes:new Uint8Array(arrayBuffer,start,length)});
+    }
+    offset=start+length;
+  }
+  if(!json) throw new Error('GLB JSON chunk was not found.');
+  json.extensions=json.extensions||{};
+  json.extensions[extensionName]=extensionValue;
+  json.extensionsUsed=Array.from(new Set([...(json.extensionsUsed||[]),extensionName]));
+  json.extensionsRequired=Array.from(new Set([...(json.extensionsRequired||[]),extensionName]));
+  const jsonBytes=new TextEncoder().encode(JSON.stringify(json));
+  const jsonLength=Math.ceil(jsonBytes.length/4)*4;
+  const chunks=[{type:0x4e4f534a,bytes:jsonBytes,length:jsonLength},...binaryChunks.map(c=>({type:c.type,bytes:c.bytes,length:Math.ceil(c.bytes.length/4)*4}))];
+  const outLength=12+chunks.reduce((n,c)=>n+8+c.length,0);
+  const out=new ArrayBuffer(outLength), outView=new DataView(out);
+  outView.setUint32(0,0x46546c67,true);outView.setUint32(4,2,true);outView.setUint32(8,outLength,true);
+  let p=12;
+  for(const chunk of chunks){
+    outView.setUint32(p,chunk.length,true);outView.setUint32(p+4,chunk.type,true);p+=8;
+    new Uint8Array(out,p,chunk.length).fill(chunk.type===0x4e4f534a?0x20:0);
+    new Uint8Array(out,p,chunk.bytes.length).set(chunk.bytes);p+=chunk.length;
+  }
+  return out;
+}
+function createVrmExtension(version, gltfJson) {
+  const meta=getExportMeta();
+  const nodeMap=buildNodeIndexMap(gltfJson);
+  const humanoid=buildHumanoid(version,nodeMap);
+  if(version==='0'){
+    const headNode=humanoid.humanBones.find(x=>x.bone==='head')?.node;
+    return {VRM:{specVersion:'0.0',exporterVersion:'Aster FBX2VRM Studio 0.1',meta:{title:meta.name,version:meta.version,author:meta.author,contactInformation:meta.contact,reference:meta.reference,allowedUserName:meta.allowed,violentUssageName:meta.violent,sexualUssageName:meta.sexual,commercialUssageName:meta.commercial,licenseName:meta.license,otherLicenseUrl:meta.other,otherPermissionUrl:meta.other},humanoid,firstPerson:{firstPersonBone:headNode,firstPersonBoneOffset:{x:0,y:0,z:0},meshAnnotations:[],lookAtTypeName:'Bone'},blendShapeMaster:{blendShapeGroups:[]},secondaryAnimation:{boneGroups:[],colliderGroups:[]},materialProperties:[]}};
+  }
+  const allowedMap={Everyone:'everyone',OnlyAuthor:'onlyAuthor',ExplicitlyLicensedPerson:'onlySeparatelyLicensedPerson'};
+  const license=meta.license;
+  const commercial=meta.commercial==='Allow'?'personalProfit':'personalNonProfit';
+  const allowRedistribution=license!=='Redistribution_Prohibited';
+  const modification=license==='CC0'||license==='CC_BY'||license==='CC_BY_NC'||license==='CC_BY_SA'||license==='CC_BY_NC_SA'?'allowModificationRedistribution':license==='CC_BY_ND'||license==='CC_BY_NC_ND'?'allowModification':'prohibited';
+  return {VRMC_vrm:{specVersion:'1.0',meta:{name:meta.name,version:meta.version,authors:[meta.author],contactInformation:meta.contact,references:meta.reference?[meta.reference]:[],licenseUrl:'https://vrm.dev/licenses/1.0/',otherLicenseUrl:meta.other||undefined,avatarPermission:allowedMap[meta.allowed]||'onlyAuthor',allowExcessivelyViolentUsage:meta.violent==='Allow',allowExcessivelySexualUsage:meta.sexual==='Allow',commercialUsage:commercial,creditNotation:'required',allowRedistribution,modification},humanoid}};
+}
+async function exportVRM(version) {
+  const button=$('exportVRM'+version);
+  const label=button.textContent;
+  try {
+    if(!currentModel) throw new Error('Load an FBX model first.');
+    button.disabled=true;button.textContent='Exporting…';
+    $('exportStatus').textContent='Building GLB and writing VRM '+(version==='0'?'0.x':'1.0')+' extension…';
+    const exporter=new GLTFExporter();
+    const glb=await exporter.parseAsync(currentModel,{binary:true,trs:true,onlyVisible:false,includeCustomExtensions:true,maxTextureSize:4096});
+    const jsonView=new DataView(glb);
+    let jsonChunk=null,offset=12;
+    while(offset<jsonView.getUint32(8,true)){
+      const len=jsonView.getUint32(offset,true),type=jsonView.getUint32(offset+4,true);
+      if(type===0x4e4f534a){jsonChunk=JSON.parse(new TextDecoder().decode(new Uint8Array(glb,offset+8,len)).trim());break;}
+      offset+=8+len;
+    }
+    if(!jsonChunk) throw new Error('Could not read exported GLB JSON.');
+    const ext=createVrmExtension(version,jsonChunk);
+    const extensionName=version==='0'?'VRM':'VRMC_vrm';
+    const result=glbWithVRMExtension(glb,extensionName,ext[extensionName]);
+    const blob=new Blob([result],{type:'model/gltf-binary'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=(getExportMeta().name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_VRM'+(version==='0'?'0':'1')+'.vrm';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    $('exportStatus').textContent='VRM '+(version==='0'?'0.x':'1.0')+' file generated. Please validate it in a VRM validator and test it in your target app.';
+    status('VRM '+(version==='0'?'0.x':'1.0')+' export generated.','good');
+  } catch(error) {
+    console.error(error);
+    $('exportStatus').textContent='Export failed: '+(error.message||String(error));
+    status('VRM export failed: '+String(error.message||error).slice(0,100),'bad');
+  } finally {
+    button.disabled=!currentModel;button.textContent=label;
+  }
+}
+$('exportVRM0').addEventListener('click',()=>exportVRM('0'));
+$('exportVRM1').addEventListener('click',()=>exportVRM('1'));
+
+function findBoneByAliases(model, aliases) {
   let found = null;
   const names = aliases.map(x => x.toLowerCase().replace(/[^a-z0-9]/g, ''));
   model.traverse(obj => {
