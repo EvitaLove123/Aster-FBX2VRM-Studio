@@ -231,7 +231,7 @@ function setupAsterWizard() {
   const poseButtons = ['resetCamera','autoTPose','resetPose','showAxes'];
   for (const id of poseButtons) {
     const button = $(id);
-    if (button) $('poseActions', poseCard).appendChild(button);
+    if (button) poseCard.querySelector('#poseActions').appendChild(button);
   }
 
   panels[0].append(cards[0], cards[1]);
