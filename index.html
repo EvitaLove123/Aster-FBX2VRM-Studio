@@ -286,7 +286,6 @@ $('resetCamera').addEventListener('click', () => {
   if (currentModel) frameObject(currentModel);
 });
 async function loadFbxBuffer(buffer, fileName) {
-  // Reset all model-dependent state before attempting a new import.
   $('empty').style.display = 'grid';
   $('exportVRM0').disabled = true;
   $('exportVRM1').disabled = true;
@@ -301,10 +300,6 @@ async function loadFbxBuffer(buffer, fileName) {
   $('materialSelect').innerHTML = '<option value="">No materials</option>';
   $('mappingStatus').textContent = 'Loading FBX…';
   $('exportStatus').textContent = 'Load a model and complete required humanoid mapping to export.';
-  try {
-    initViewer();
-    disposeModel();
-  $('resetCamera').disabled = true;
   $('fileName').textContent = fileName;
   $('fileSize').textContent = (buffer.byteLength / 1048576).toFixed(2) + ' MB';
   $('meshCount').textContent = '—';
@@ -313,23 +308,24 @@ async function loadFbxBuffer(buffer, fileName) {
   $('details').textContent = 'Reading FBX data locally…';
   status('Parsing FBX…');
   try {
+    initViewer();
+    disposeModel();
     const loader = new FBXLoader(createTextureManager());
     const model = loader.parse(buffer.slice(0), '');
     if (!model || !model.isObject3D) throw new Error('FBXLoader did not return a valid 3D object.');
     model.traverse(obj => {
       obj.visible = true;
-      if (obj.isMesh) {
-        obj.frustumCulled = false;
-        if (obj.geometry) {
-          if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) obj.geometry.computeVertexNormals();
-          if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
-        }
-        const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
-        for (const mat of mats) {
-          mat.side = THREE.DoubleSide;
-          mat.visible = true;
-          mat.needsUpdate = true;
-        }
+      if (!obj.isMesh) return;
+      obj.frustumCulled = false;
+      if (obj.geometry) {
+        if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) obj.geometry.computeVertexNormals();
+        if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+      }
+      const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+      for (const mat of mats) {
+        mat.side = THREE.DoubleSide;
+        mat.visible = true;
+        mat.needsUpdate = true;
       }
     });
     model.updateMatrixWorld(true);
