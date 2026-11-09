@@ -631,7 +631,7 @@ function fingerScore(bone,slot){
   ring:['ring','薬指'],
   little:['little','pinky','pinkie','小指']
  };
- if(!fingerAliases[info.finger].some(x=>context.includes(x)||normalizedContext.includes(normBone(x))))return 0;
+ if(!fingerAliases[info.finger].some(x=>context.includes(x)||(normBone(x)&&normalizedContext.includes(normBone(x)))))return 0;
  const left=/(left|左|_l\b|\.l\b|-l\b|^l(?=[a-z])|l[0-9]$)/i.test(context)||/(^|[^a-z])l([^a-z]|$)/i.test(context);
  const right=/(right|右|_r\b|\.r\b|-r\b|^r(?=[a-z])|r[0-9]$)/i.test(context)||/(^|[^a-z])r([^a-z]|$)/i.test(context);
  if(info.side==='left'&&right&&!left)return 0;
