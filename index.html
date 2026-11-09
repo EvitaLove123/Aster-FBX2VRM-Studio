@@ -109,7 +109,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <div class="formfield"><label for="metaVersion">Version</label><input id="metaVersion" type="text" value="1.0"></div>
 <div class="formfield"><label for="metaContact">Contact information</label><input id="metaContact" type="text" placeholder="Optional"></div>
 <div class="formfield"><label for="metaReference">Reference URL</label><input id="metaReference" type="text" placeholder="Optional"></div>
-<div class="formfield"><label for="metaLicense">Allowed user</label><select id="metaLicense"><option value="Everyone">Everyone</option><option value="OnlyAuthor">Only Author</option><option value="ExplicitlyLicensedPerson">Explicitly Licensed Person</option></select></div>
+<div class="formfield"><label for="metaLicense">Allowed user</label><select id="metaLicense"><option value="OnlyAuthor">Only Author</option><option value="ExplicitlyLicensedPerson">Explicitly Licensed Person</option><option value="Everyone">Everyone</option></select></div>
 <div class="formfield"><label for="metaPermission">Violent usage</label><select id="metaPermission"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
 <div class="formfield"><label for="metaSexual">Sexual usage</label><select id="metaSexual"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
 <div class="formfield"><label for="metaCommercial">Commercial usage (VRM 0.x)</label><select id="metaCommercial"><option value="Disallow">Disallow</option><option value="Allow">Allow</option></select></div>
@@ -557,7 +557,7 @@ function createVrmExtension(version, gltfJson) {
   const license=meta.license;
   const commercial=meta.commercial==='Allow'?'personalProfit':'personalNonProfit';
   const allowRedistribution=license!=='Redistribution_Prohibited';
-  const modification=license==='CC0'||license==='CC_BY'||license==='CC_BY_NC'||license==='CC_BY_SA'||license==='CC_BY_NC_SA'?'allowModificationRedistribution':license==='CC_BY_ND'||license==='CC_BY_NC_ND'?'allowModification':'prohibited';
+  const modification=license==='CC0'||license==='CC_BY'||license==='CC_BY_NC'||license==='CC_BY_SA'||license==='CC_BY_NC_SA'?'allowModificationRedistribution':'prohibited';
   return {VRMC_vrm:{specVersion:'1.0',meta:{name:meta.name,version:meta.version,authors:[meta.author],contactInformation:meta.contact,references:meta.reference?[meta.reference]:[],licenseUrl:'https://vrm.dev/licenses/1.0/',otherLicenseUrl:meta.other||undefined,avatarPermission:allowedMap[meta.allowed]||'onlyAuthor',allowExcessivelyViolentUsage:meta.violent==='Allow',allowExcessivelySexualUsage:meta.sexual==='Allow',commercialUsage:commercial,creditNotation:'required',allowRedistribution,modification},humanoid}};
 }
 async function exportVRM(version) {
