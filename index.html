@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f7fc">
-<title>Aster FBX → VRM Studio · Prototype 01</title>
+<title>Aster FBX2VRM Studio · Step-by-step Converter</title>
 <style>
 :root{color-scheme:light;--bg:#f5f7fc;--panel:#fff;--ink:#1e2a3b;--muted:#68778c;--line:#e3e9f2;--blue:#5479b8;--blue2:#eaf1fc;--good:#e8f6ee;--bad:#ffeded;--warn:#fff4df}
 *{box-sizing:border-box}
@@ -31,13 +31,39 @@ button.secondary{background:var(--blue2);color:#304866}button:disabled{opacity:.
 @media(max-width:360px){.grid{grid-template-columns:1fr 1fr}}
 
 select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink)}input[type=text],input[type=number],textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink)}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.formfield{min-width:0}.formfield label{display:block;font-size:12px;color:var(--muted);font-weight:800;margin:0 0 5px}.checkrow{display:flex;align-items:center;gap:8px;margin:8px 0}.checkrow input{width:20px;height:20px}.sectionhint{font-size:12px;color:var(--muted);margin-top:7px}@media(max-width:500px){.formgrid{grid-template-columns:1fr}}
+
+/* Aster five-step wizard */
+.wizard-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:14px 0 12px}
+.wizard-tab{margin:0;min-width:0;min-height:58px;padding:9px 6px;background:#eaf0fa;color:#435674;border:1px solid #dce5f2;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.wizard-tab .step-no{font-size:11px;opacity:.75;letter-spacing:.08em}
+.wizard-tab .step-name{font-size:12px;white-space:nowrap}
+.wizard-tab[aria-current="step"]{background:#5479b8;color:#fff;border-color:#5479b8;box-shadow:0 5px 16px #5479b833}
+.wizard-progress{height:5px;border-radius:99px;background:#e2e9f3;overflow:hidden;margin-bottom:14px}
+.wizard-progress span{display:block;width:20%;height:100%;background:#5479b8;border-radius:99px;transition:width .2s ease}
+.wizard-panel[hidden]{display:none!important}
+.wizard-panel{animation:wizard-in .18s ease}
+@keyframes wizard-in{from{opacity:.6;transform:translateY(4px)}to{opacity:1;transform:none}}
+.wizard-footer{display:flex;justify-content:space-between;gap:10px;margin:16px 0 4px}
+.wizard-footer button{flex:1;margin:0;min-height:48px}
+.wizard-step-kicker{font-size:11px;font-weight:850;letter-spacing:.13em;color:var(--blue);margin-bottom:5px}
+.pose-intro{padding:12px;border:1px solid var(--line);border-radius:12px;background:#f8faff;color:var(--muted);font-size:13px;margin-bottom:12px}
+#poseActions{display:flex;flex-wrap:wrap;gap:6px}
+#poseActions button{margin:0;flex:1 1 140px}
+@media(max-width:520px){
+ .wizard-nav{gap:5px}
+ .wizard-tab{min-height:54px;padding:7px 2px;border-radius:10px}
+ .wizard-tab .step-name{font-size:10px}
+ .wizard-tab .step-no{font-size:10px}
+ .wizard-footer button{padding:10px 8px;font-size:13px}
+}
+
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
 </script>
 </head>
 <body>
-<header>✦ ASTER WORKSHOP <span>/ FBX → VRM · MOBILE PROTOTYPE 01</span></header>
+<header>✦ ASTER FBX2VRM STUDIO <span>/ STEP-BY-STEP CONVERTER</span></header>
 <main>
 <section class="hero">
 <div class="eyebrow">ANDROID-FIRST · BROWSER-SIDE PROCESSING</div>
@@ -160,6 +186,125 @@ let initialPose = new Map();
 let boneList = [];
 let materialList = [];
 let humanoidMapping = {};
+
+
+function setupAsterWizard() {
+  const main = document.querySelector('main');
+  const hero = main && main.querySelector('.hero');
+  const cards = main ? Array.from(main.querySelectorAll(':scope > section.card')) : [];
+  if (!main || !hero || cards.length !== 7) return;
+
+  const nav = document.createElement('nav');
+  nav.className = 'wizard-nav';
+  nav.setAttribute('aria-label', 'Conversion steps');
+  const steps = [
+    ['01','Input'],['02','Pose'],['03','Bones'],['04','Materials'],['05','Export']
+  ];
+  const panels = steps.map((step, index) => {
+    const panel = document.createElement('div');
+    panel.className = 'wizard-panel';
+    panel.dataset.step = String(index);
+    panel.hidden = index !== 0;
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'wizard-tab';
+    tab.innerHTML = '<span class="step-no">STEP ' + step[0] + '</span><span class="step-name">' + step[1] + '</span>';
+    tab.setAttribute('aria-label', 'Step ' + step[0] + ': ' + step[1]);
+    tab.addEventListener('click', () => showWizardStep(index));
+    nav.appendChild(tab);
+    return panel;
+  });
+
+  const progress = document.createElement('div');
+  progress.className = 'wizard-progress';
+  progress.setAttribute('role','progressbar');
+  progress.setAttribute('aria-label','Wizard progress');
+  progress.setAttribute('aria-valuemin','1');
+  progress.setAttribute('aria-valuemax','5');
+  const progressFill = document.createElement('span');
+  progress.appendChild(progressFill);
+
+  const poseCard = document.createElement('section');
+  poseCard.className = 'card';
+  poseCard.innerHTML = '<div class="wizard-step-kicker">STEP 02</div><h2>Pose & camera controls</h2><p class="pose-intro">Use the available pose tools to prepare the model. Auto T-pose is experimental; inspect the result in the 3D preview before continuing. Camera controls do not modify the model.</p><div id="poseActions" class="toolbar"></div>';
+
+  const poseButtons = ['resetCamera','autoTPose','resetPose','showAxes'];
+  for (const id of poseButtons) {
+    const button = $(id);
+    if (button) $('poseActions', poseCard).appendChild(button);
+  }
+
+  panels[0].append(cards[0], cards[1]);
+  panels[1].appendChild(poseCard);
+  panels[2].appendChild(cards[2]);
+  panels[3].appendChild(cards[3]);
+  panels[4].append(cards[4], cards[5], cards[6]);
+
+  const headings = [
+    ['Import model and textures','Model inspection'],
+    ['Pose & camera controls'],
+    ['Humanoid & finger mapping'],
+    ['Material editor'],
+    ['VRM metadata','VRM export','Prototype status']
+  ];
+  panels.forEach((panel, i) => {
+    panel.querySelectorAll('h2').forEach((h, j) => {
+      if (headings[i] && headings[i][j]) h.textContent = headings[i][j];
+    });
+    const footer = document.createElement('div');
+    footer.className = 'wizard-footer';
+    if (i > 0) {
+      const back = document.createElement('button');
+      back.type = 'button'; back.className = 'secondary'; back.textContent = '← Back';
+      back.addEventListener('click', () => showWizardStep(i - 1));
+      footer.appendChild(back);
+    } else {
+      const spacer = document.createElement('span');
+      footer.appendChild(spacer);
+    }
+    if (i < 4) {
+      const next = document.createElement('button');
+      next.type = 'button'; next.textContent = 'Next step →';
+      next.addEventListener('click', () => showWizardStep(i + 1));
+      footer.appendChild(next);
+    } else {
+      const finish = document.createElement('button');
+      finish.type = 'button'; finish.className = 'secondary'; finish.textContent = '← Review materials';
+      finish.addEventListener('click', () => showWizardStep(3));
+      footer.appendChild(finish);
+    }
+    panel.appendChild(footer);
+  });
+
+  hero.after(nav, progress, ...panels);
+  window.asterShowWizardStep = showWizardStep;
+  showWizardStep(0);
+
+  function showWizardStep(index) {
+    const active = Math.max(0, Math.min(4, Number(index) || 0));
+    panels.forEach((panel, i) => { panel.hidden = i !== active; });
+    Array.from(nav.children).forEach((tab, i) => {
+      if (i === active) tab.setAttribute('aria-current','step');
+      else tab.removeAttribute('aria-current');
+    });
+    progressFill.style.width = ((active + 1) * 20) + '%';
+    progress.setAttribute('aria-valuenow', String(active + 1));
+    if (renderer && camera && controls) {
+      requestAnimationFrame(() => {
+        const w = Math.max(1, viewport.clientWidth);
+        const h = Math.max(1, viewport.clientHeight);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      });
+    }
+    if (active === 4) $('exportStatus').scrollIntoView({block:'nearest',behavior:'smooth'});
+    else window.scrollTo({top:0,behavior:'smooth'});
+  }
+}
+
+
+setupAsterWizard();
 
 function status(message, kind='') {
   statusEl.textContent = message;
