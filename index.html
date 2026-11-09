@@ -29,6 +29,8 @@ button.secondary{background:var(--blue2);color:#304866}button:disabled{opacity:.
 .note{font-size:13px}.toolbar{display:flex;flex-wrap:wrap;gap:4px}
 @media(max-width:650px){main{margin:13px auto}.card{padding:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}#viewport{min-height:285px;height:52vh}}
 @media(max-width:360px){.grid{grid-template-columns:1fr 1fr}}
+
+select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink)}input[type=text],input[type=number],textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:9px;background:#fff;color:var(--ink)}.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.formfield{min-width:0}.formfield label{display:block;font-size:12px;color:var(--muted);font-weight:800;margin:0 0 5px}.checkrow{display:flex;align-items:center;gap:8px;margin:8px 0}.checkrow input{width:20px;height:20px}.sectionhint{font-size:12px;color:var(--muted);margin-top:7px}@media(max-width:500px){.formgrid{grid-template-columns:1fr}}
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
@@ -103,7 +105,7 @@ let textureUrls = [];
 let textureByName = new Map();
 let lastFbxBuffer = null;
 let lastFbxName = "";
-let initialPose = new Map();
+let initialPose = new Map();\nlet boneList = [];\nlet materialList = [];\nlet humanoidMapping = {};
 
 function status(message, kind='') {
   statusEl.textContent = message;
@@ -306,7 +308,89 @@ $('fbxFile').addEventListener('change', async event => {
   lastFbxBuffer = await file.arrayBuffer();
   await loadFbxBuffer(lastFbxBuffer, lastFbxName);
 });
-function findBoneByAliases(model, aliases) {
+
+const humanoidSlots = [
+ ['hips',['hips','pelvis','bip001pelvis']],['spine',['spine','spine1','lowerback']],
+ ['chest',['chest','spine2','spine2']],['upperChest',['upperchest','spine3']],
+ ['neck',['neck']],['head',['head']],
+ ['leftShoulder',['leftshoulder','lclavicle','bip001lclavicle']],['leftUpperArm',['leftupperarm','leftarm','luparm','bip001lupperarm']],
+ ['leftLowerArm',['leftlowerarm','leftforearm','lforearm','bip001lforearm']],['leftHand',['lefthand','lhand','bip001lhand']],
+ ['rightShoulder',['rightshoulder','rclavicle','bip001rclavicle']],['rightUpperArm',['rightupperarm','rightarm','ruparm','bip001rupperarm']],
+ ['rightLowerArm',['rightlowerarm','rightforearm','rforearm','bip001rforearm']],['rightHand',['righthand','rhand','bip001rhand']],
+ ['leftUpperLeg',['leftupleg','leftthigh','lupleg','bip001lthigh']],['leftLowerLeg',['leftlowerleg','leftcalf','lleg','bip001lcalf']],['leftFoot',['leftfoot','bip001lfoot']],['leftToes',['lefttoebase','lefttoes']],
+ ['rightUpperLeg',['rightupleg','rightthigh','rupleg','bip001rthigh']],['rightLowerLeg',['rightlowerleg','rightcalf','rleg','bip001rcalf']],['rightFoot',['rightfoot','bip001rfoot']],['rightToes',['righttoebase','righttoes']]
+];
+const fingerNames=['Thumb','Index','Middle','Ring','Little'];
+for(const side of ['Left','Right']) for(const finger of fingerNames) for(let seg=1;seg<=3;seg++){
+ const slot=side.toLowerCase()+finger+'Proximal'.toLowerCase().replace('proximal','Proximal')+seg;
+ const aliases=[side+finger+(seg===1?'Proximal':seg===2?'Intermediate':'Distal'),side+finger+seg,side[0].toLowerCase()+finger+seg];
+ humanoidSlots.push([slot.toLowerCase(),aliases]);
+}
+function normBone(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function populateBoneTools(){
+ boneList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isBone) boneList.push(o);});
+ const opts='<option value="">— Not mapped —</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+(b.name||'Bone '+i)+'</option>').join('');
+ $('customBoneSelect').innerHTML='<option value="">Select a bone…</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+(b.name||'Bone '+i)+'</option>').join('');
+ $('boneMappingGrid').innerHTML='';
+ for(const [slot] of humanoidSlots){
+  const wrap=document.createElement('div');wrap.className='formfield';
+  const label=document.createElement('label');label.textContent=slot;
+  const select=document.createElement('select');select.dataset.slot=slot;select.innerHTML=opts;
+  select.value=humanoidMapping[slot]??'';
+  select.addEventListener('change',()=>{humanoidMapping[slot]=select.value;});
+  wrap.append(label,select);$('boneMappingGrid').appendChild(wrap);
+ }
+ $('autoMap').disabled=!boneList.length;$('clearMap').disabled=!boneList.length;
+}
+function autoMapBones(){
+ humanoidMapping={};
+ for(const [slot,aliases] of humanoidSlots){
+  let idx=-1;
+  for(let i=0;i<boneList.length;i++){
+   const n=normBone(boneList[i].name);
+   if(aliases.some(a=>{const x=normBone(a);return n===x||n.endsWith(x)||n.includes(x); })){idx=i;break;}
+  }
+  if(idx>=0) humanoidMapping[slot]=String(idx);
+ }
+ populateBoneTools();
+ const mapped=Object.keys(humanoidMapping).length;
+ $('mappingStatus').textContent='Auto-mapped '+mapped+' / '+humanoidSlots.length+' humanoid slots. Please review possible false matches and manually select missing bones.';
+}
+function populateMaterials(){
+ materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
+ $('materialSelect').innerHTML=materialList.length?materialList.map((x,i)=>'<option value="'+i+'">'+x.label+'</option>').join(''):'<option value="">No materials</option>';
+ if(materialList.length) loadMaterialControls();
+}
+function loadMaterialControls(){
+ const entry=materialList[Number($('materialSelect').value)||0];if(!entry)return;
+ const m=entry.material;
+ $('alphaMode').value=m.alphaTest>0?'mask':m.transparent?'blend':'opaque';
+ $('matColor').value='#'+(m.color?m.color.getHexString():'ffffff');
+ $('matOpacity').value=m.opacity??1;$('alphaCutoff').value=m.alphaTest??0.5;
+ $('matSide').value=m.side===THREE.FrontSide?'front':m.side===THREE.BackSide?'back':'double';
+ $('unlitToggle').checked=!!m.userData.asterUnlit;
+}
+$('materialSelect').addEventListener('change',loadMaterialControls);
+$('applyMaterial').addEventListener('click',()=>{
+ const e=materialList[Number($('materialSelect').value)||0];if(!e)return;const m=e.material;
+ if(m.color)m.color.set($('matColor').value);
+ const mode=$('alphaMode').value;m.transparent=mode==='blend';m.alphaTest=mode==='mask'?Math.max(0,Math.min(1,Number($('alphaCutoff').value)||0)):0;
+ m.opacity=Math.max(0,Math.min(1,Number($('matOpacity').value)||0));
+ if(mode==='opaque'){m.transparent=false;m.opacity=1;m.alphaTest=0;}
+ m.depthWrite=mode!=='blend';m.side=$('matSide').value==='front'?THREE.FrontSide:$('matSide').value==='back'?THREE.BackSide:THREE.DoubleSide;
+ m.userData.asterUnlit=$('unlitToggle').checked;
+ if('emissive' in m){if(m.userData.asterUnlit){m.emissive.set(m.color||0xffffff);m.emissiveIntensity=1;}else{m.emissive.set(0x000000);m.emissiveIntensity=0;}}
+ m.needsUpdate=true;
+ status('Material preview updated. Unlit is an emissive approximation until VRM export.', 'good');
+});
+$('autoMap').addEventListener('click',autoMapBones);
+$('clearMap').addEventListener('click',()=>{humanoidMapping={};populateBoneTools();$('mappingStatus').textContent='All mapping assignments cleared.';});
+$('customBoneSelect').addEventListener('change',()=>{const i=Number($('customBoneSelect').value);if(Number.isInteger(i)&&boneList[i])$('mappingStatus').textContent='Selected additional bone: '+boneList[i].name;});
+$('exportMeta').addEventListener('click',()=>{
+ const data={name:$('metaName').value,author:$('metaAuthor').value,version:$('metaVersion').value,contactInformation:$('metaContact').value,reference:$('metaReference').value,allowedUser:$('metaLicense').value,violentUsage:$('metaPermission').value,sexualUsage:$('metaSexual').value,commercialUsage:$('metaCommercial').value,redistribution:$('metaRedistribution').value,licenseName:$('metaLicenseName').value,otherLicenseUrl:$('metaOther').value};
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(data.name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_metadata.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+\nfunction findBoneByAliases(model, aliases) {
   let found = null;
   const names = aliases.map(x => x.toLowerCase().replace(/[^a-z0-9]/g, ''));
   model.traverse(obj => {
