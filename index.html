@@ -125,7 +125,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 </div>
 <div class="formgrid" style="margin-top:14px">
 <div class="formfield"><label for="materialTextureChannel">Texture channel</label><select id="materialTextureChannel"><option value="map">Base Color / Albedo</option><option value="normalMap">Normal</option><option value="roughnessMap">Roughness</option><option value="metalnessMap">Metallic</option><option value="emissiveMap">Emissive</option><option value="alphaMap">Alpha</option><option value="aoMap">Ambient Occlusion</option></select></div>
-<div class="formfield"><label for="materialTextureFile">Add texture to selected material</label><input id="materialTextureFile" type="file" accept="image/png,image/jpeg,image/webp" style="width:100%;font:inherit"></div>
+<div class="formfield"><label for="materialTextureFile">Add texture to selected material</label><input id="materialTextureFile" type="file" accept="image/png,image/jpeg" style="width:100%;font:inherit"></div>
 </div>
 <p class="sectionhint" id="materialTextureStatus">Choose a material, texture channel and image, then apply it.</p>
 <label class="checkrow"><input id="unlitToggle" type="checkbox"> Unlit preview</label>
@@ -735,6 +735,9 @@ function loadMaterialControls(){
  $('matOpacity').value=m.opacity??1;$('alphaCutoff').value=m.alphaTest??0.5;
  $('matSide').value=m.side===THREE.FrontSide?'front':m.side===THREE.BackSide?'back':'double';
  $('unlitToggle').checked=!!m.userData.asterUnlit;
+ const channelNames=[['map','Base Color'],['normalMap','Normal'],['roughnessMap','Roughness'],['metalnessMap','Metallic'],['emissiveMap','Emissive'],['alphaMap','Alpha'],['aoMap','AO']];
+ const assigned=channelNames.filter(([key])=>!!m[key]).map(([key,label])=>label);
+ $('materialTextureStatus').textContent=assigned.length?'Textures on this material: '+assigned.join(', '):'No material textures assigned yet. Choose a channel and PNG/JPG image below.';
 }
 $('materialSelect').addEventListener('change',loadMaterialControls);
 $('materialTextureFile').addEventListener('change',()=>{
