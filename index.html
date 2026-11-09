@@ -322,7 +322,7 @@ const humanoidSlots = [
 ];
 const fingerNames=['Thumb','Index','Middle','Ring','Little'];
 for(const side of ['Left','Right']) for(const finger of fingerNames) for(let seg=1;seg<=3;seg++){
- const slot=side.toLowerCase()+finger+'Proximal'.toLowerCase().replace('proximal','Proximal')+seg;
+ const slot=side.toLowerCase()+finger+(['Proximal','Intermediate','Distal'][seg-1]);
  const aliases=[side+finger+(seg===1?'Proximal':seg===2?'Intermediate':'Distal'),side+finger+seg,side[0].toLowerCase()+finger+seg];
  humanoidSlots.push([slot.toLowerCase(),aliases]);
 }
