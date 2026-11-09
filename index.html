@@ -361,6 +361,7 @@ $('fbxFile').addEventListener('change', async event => {
     status('Please select an .fbx file.', 'bad');
     return;
   }
+  humanoidMapping = {};
   lastFbxName = file.name;
   status('Reading ' + file.name + '…');
   try {
@@ -389,7 +390,8 @@ const humanoidSlots = [
 const fingerNames=['Thumb','Index','Middle','Ring','Little'];
 for(const side of ['Left','Right']) for(const finger of fingerNames) for(let seg=1;seg<=3;seg++){
  const slot=side.toLowerCase()+finger+(['Proximal','Intermediate','Distal'][seg-1]);
- const aliases=[side+finger+(seg===1?'Proximal':seg===2?'Intermediate':'Distal'),side+finger+seg,side[0].toLowerCase()+finger+seg];
+ const segmentName=seg===1?'Proximal':seg===2?'Intermediate':'Distal';
+ const aliases=[side+finger+segmentName,side+finger+seg,side[0].toLowerCase()+finger+seg,finger+segmentName+'_'+side[0]+'_'+seg,finger+'Finger'+seg+'_'+side[0],finger+seg+'_'+side[0],side[0]+'_'+finger+seg,finger+'_'+side[0]+'_'+seg];
  humanoidSlots.push([slot,aliases]);
 }
 function normBone(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
@@ -549,7 +551,7 @@ function createVrmExtension(version, gltfJson) {
   const humanoid=buildHumanoid(version,nodeMap);
   if(version==='0'){
     const headNode=humanoid.humanBones.find(x=>x.bone==='head')?.node;
-    return {VRM:{specVersion:'0.0',exporterVersion:'Aster FBX2VRM Studio 0.1',meta:{title:meta.name,version:meta.version,author:meta.author,contactInformation:meta.contact,reference:meta.reference,allowedUserName:meta.allowed,violentUssageName:meta.violent,sexualUssageName:meta.sexual,commercialUssageName:meta.commercial,licenseName:meta.license,otherLicenseUrl:meta.other,otherPermissionUrl:meta.other},humanoid,firstPerson:{firstPersonBone:headNode,firstPersonBoneOffset:{x:0,y:0,z:0},meshAnnotations:[],lookAtTypeName:'Bone'},blendShapeMaster:{blendShapeGroups:[]},secondaryAnimation:{boneGroups:[],colliderGroups:[]},materialProperties:[]}};
+    return {VRM:{specVersion:'0.0',exporterVersion:'Aster FBX2VRM Studio 0.1',meta:{title:meta.name,version:meta.version,author:meta.author,contactInformation:meta.contact,reference:meta.reference,allowedUserName:meta.allowed,violentUssageName:meta.violent,sexualUssageName:meta.sexual,commercialUssageName:meta.commercial,licenseName:meta.license,otherLicenseUrl:meta.other,otherPermissionUrl:meta.other},humanoid,firstPerson:{firstPersonBone:headNode,firstPersonBoneOffset:{x:0,y:0,z:0},meshAnnotations:[],lookAtTypeName:'Bone'},blendShapeMaster:{blendShapeGroups:[]},secondaryAnimation:{boneGroups:[],colliderGroups:[]},materialProperties:(gltfJson.materials||[]).map(m=>({name:m.name||'Material',shader:'VRM_USE_GLTFSHADER',renderQueue:2000,floatProperties:{},vectorProperties:{},textureProperties:{},keywordMap:{},tagMap:{}}))}};
   }
   const allowedMap={Everyone:'everyone',OnlyAuthor:'onlyAuthor',ExplicitlyLicensedPerson:'onlySeparatelyLicensedPerson'};
   const license=meta.license;
