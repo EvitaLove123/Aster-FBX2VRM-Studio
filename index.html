@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f7fc">
+<title>Aster FBX → VRM Studio · Prototype 01</title>
+<style>
+:root{color-scheme:light;--bg:#f5f7fc;--panel:#fff;--ink:#1e2a3b;--muted:#68778c;--line:#e3e9f2;--blue:#5479b8;--blue2:#eaf1fc;--good:#e8f6ee;--bad:#ffeded;--warn:#fff4df}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{position:sticky;top:0;z-index:5;padding:13px 16px;background:#ffffffed;border-bottom:1px solid var(--line);backdrop-filter:blur(12px);font-weight:850;letter-spacing:.055em}
+header span{font-weight:550;color:var(--muted);letter-spacing:0}
+main{max-width:1050px;margin:20px auto;padding:0 13px 42px}
+.hero{padding:7px 2px 15px}.eyebrow{color:var(--blue);font-size:12px;font-weight:850;letter-spacing:.15em}
+h1{font-size:clamp(27px,6vw,42px);line-height:1.08;margin:7px 0 9px}.hero p,.note{color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px;margin:12px 0;box-shadow:0 8px 28px #2439570c}
+h2{font-size:18px;margin:0 0 12px}
+.drop{border:2px dashed #aabbd4;border-radius:14px;padding:16px 12px;text-align:center;background:#f9fbff}
+.drop strong{display:block}.drop input{display:block;max-width:100%;margin:10px auto 0}
+input[type=file]{font:inherit;font-size:14px}
+button{border:0;border-radius:11px;background:var(--blue);color:#fff;font-weight:750;padding:11px 15px;margin:8px 6px 0 0;min-height:44px;touch-action:manipulation}
+button.secondary{background:var(--blue2);color:#304866}button:disabled{opacity:.45}
+.status{display:inline-block;border-radius:99px;background:var(--warn);color:#855b16;padding:5px 10px;font-size:12px;font-weight:800;overflow-wrap:anywhere}.status.good{background:var(--good);color:#23633b}.status.bad{background:var(--bad);color:#9b3030}
+#viewport{height:min(60vh,560px);min-height:300px;border-radius:14px;background:linear-gradient(#edf3fc,#e5ebf5);overflow:hidden;position:relative;touch-action:none}
+#viewport canvas{display:block;width:100%;height:100%}.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.field{background:#f8faff;border:1px solid var(--line);border-radius:12px;padding:11px;min-width:0}
+.field strong{display:block;font-size:12px;color:var(--muted)}.field span{display:block;font-weight:700;overflow-wrap:anywhere}
+.note{font-size:13px}.toolbar{display:flex;flex-wrap:wrap;gap:4px}
+@media(max-width:650px){main{margin:13px auto}.card{padding:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}#viewport{min-height:285px;height:52vh}}
+@media(max-width:360px){.grid{grid-template-columns:1fr 1fr}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<header>✦ ASTER WORKSHOP <span>/ FBX → VRM · MOBILE PROTOTYPE 01</span></header>
+<main>
+<section class="hero">
+<div class="eyebrow">ANDROID-FIRST · BROWSER-SIDE PROCESSING</div>
+<h1>FBX → VRM Studio</h1>
+<p>Import an FBX model, attach external textures, and inspect it in an interactive 3D viewport. Files are processed locally in this browser session.</p>
+</section>
+<section class="card">
+<h2>1. Import model and textures</h2>
+<div class="drop">
+<strong>Choose an FBX model</strong>
+<input id="fbxFile" type="file" accept=".fbx,application/octet-stream">
+<p class="note">Select one .fbx file. Binary and ASCII FBX parsing is delegated to Three.js FBXLoader.</p>
+</div>
+<div class="drop" style="margin-top:11px">
+<strong>Add external texture files (optional)</strong>
+<input id="textureFiles" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" multiple>
+<p class="note">Choose the texture images referenced by the FBX. Matching is best-effort by filename.</p>
+</div>
+<p><span id="status" class="status">Waiting for an FBX file</span></p>
+<div id="viewport"><div class="empty" id="empty">Your FBX model preview will appear here.<br>Choose an FBX file to begin.</div></div>
+<div class="toolbar">
+<button id="resetCamera" class="secondary" type="button" disabled>Reset camera</button>
+<button id="autoTPose" type="button" disabled>Auto T-pose</button>
+<button id="resetPose" class="secondary" type="button" disabled>Reset pose</button>
+<button id="showAxes" class="secondary" type="button">Toggle axes</button>
+</div>
+<p class="note">Touch: drag to orbit · pinch to zoom · two-finger drag to pan. On desktop: left-drag orbit · wheel zoom · right-drag pan.</p>
+</section>
+<section class="card">
+<h2>2. Model inspection</h2>
+<div class="grid">
+<div class="field"><strong>File</strong><span id="fileName">Not loaded</span></div>
+<div class="field"><strong>File size</strong><span id="fileSize">—</span></div>
+<div class="field"><strong>Meshes</strong><span id="meshCount">—</span></div>
+<div class="field"><strong>Materials</strong><span id="materialCount">—</span></div>
+<div class="field"><strong>Skeleton bones</strong><span id="boneCount">—</span></div>
+<div class="field"><strong>External textures</strong><span id="textureCount">0 selected</span></div>
+</div>
+<p class="note" id="details">No FBX has been parsed yet.</p>
+</section>
+<section class="card">
+<h2>3. Prototype status</h2>
+<ul>
+<li>FBX file selection and local ArrayBuffer parsing</li>
+<li>External image selection with filename-based URL matching, including reloading after textures are added</li>
+<li>Mesh visibility recovery and double-sided material preview</li>
+<li>Experimental Auto T-pose for recognized upper-arm, forearm, and hand bones</li>
+<li>Three.js 3D scene with lighting, grid, axes, and responsive resize</li>
+<li>Orbit, zoom, pan, automatic framing, and camera reset</li>
+<li>Basic mesh, material, and skeleton inspection</li>
+</ul>
+<p class="note">This prototype is an FBX importer and viewer, not yet a VRM converter. Humanoid mapping, pose editing, skin-weight tools, expressions, SpringBone/colliders, and VRM exporters are later stages.</p>
+</section>
+</main>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+const $ = id => document.getElementById(id);
+const viewport = $('viewport');
+const statusEl = $('status');
+let renderer, scene, camera, controls, currentModel, grid, axes;
+let textureUrls = [];
+let textureByName = new Map();
+let lastFbxBuffer = null;
+let lastFbxName = "";
+let initialPose = new Map();
+
+function status(message, kind='') {
+  statusEl.textContent = message;
+  statusEl.className = 'status' + (kind ? ' ' + kind : '');
+}
+function basename(value) {
+  let s = String(value || '').replace(/\\/g,'/');
+  try { s = decodeURIComponent(s); } catch {}
+  return s.split('/').pop().toLowerCase();
+}
+function releaseTextures() {
+  for (const url of textureUrls) URL.revokeObjectURL(url);
+  textureUrls = [];
+  textureByName.clear();
+}
+function initViewer() {
+  if (renderer) return;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xeaf0f8);
+  camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100000);
+  camera.position.set(4, 4, 8);
+  renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  viewport.appendChild(renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.075;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8895aa, 2));
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(7, 12, 9); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.8);
+  fill.position.set(-8, 5, -7); scene.add(fill);
+  grid = new THREE.GridHelper(20, 20, 0x9eacc1, 0xd2dae7);
+  scene.add(grid);
+  axes = new THREE.AxesHelper(2.5); axes.position.y = 0.015; scene.add(axes);
+  const resize = () => {
+    const w = Math.max(1, viewport.clientWidth);
+    const h = Math.max(1, viewport.clientHeight);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  };
+  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(viewport);
+  else window.addEventListener('resize', resize);
+  resize();
+  renderer.setAnimationLoop(() => {
+    controls.update();
+    renderer.render(scene, camera);
+  });
+}
+function disposeModel() {
+  if (!currentModel) return;
+  scene.remove(currentModel);
+  currentModel.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+    for (const mat of mats) {
+      for (const key of ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','alphaMap','aoMap','bumpMap','displacementMap']) {
+        const tex = mat[key];
+        if (tex && tex.dispose) tex.dispose();
+      }
+      mat.dispose();
+    }
+  });
+  currentModel = null;
+  initialPose.clear();
+  $('autoTPose').disabled = true;
+  $('resetPose').disabled = true;
+}
+function frameObject(object) {
+  object.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(object);
+  if (bounds.isEmpty()) throw new Error('The imported FBX has no measurable mesh bounds.');
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 0.01);
+  const vfov = THREE.MathUtils.degToRad(camera.fov);
+  const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  const distance = Math.max(
+    maxDim / (2 * Math.tan(vfov / 2)),
+    maxDim / (2 * Math.tan(hfov / 2))
+  ) * 1.55;
+  camera.position.set(center.x + distance * 0.12, center.y + distance * 0.08, center.z + distance);
+  camera.near = Math.max(0.001, distance / 10000);
+  camera.far = Math.max(1000, distance * 100);
+  camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.minDistance = maxDim * 0.015;
+  controls.maxDistance = maxDim * 30;
+  controls.update();
+}
+function createTextureManager() {
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier(url => {
+    const key = basename(url);
+    return textureByName.get(key) || url;
+  });
+  manager.onError = url => {
+    status('Model loaded; texture not found: ' + basename(url), '');
+  };
+  return manager;
+}
+$('textureFiles').addEventListener('change', async () => {
+  releaseTextures();
+  const files = Array.from($('textureFiles').files || []);
+  for (const file of files) {
+    const url = URL.createObjectURL(file);
+    textureUrls.push(url);
+    textureByName.set(file.name.toLowerCase(), url);
+  }
+  $('textureCount').textContent = files.length + ' selected';
+  if (lastFbxBuffer) {
+    status('Applying textures and reloading FBX…');
+    await loadFbxBuffer(lastFbxBuffer, lastFbxName);
+  }
+});
+$('showAxes').addEventListener('click', () => {
+  if (!axes || !grid) return;
+  axes.visible = !axes.visible;
+  grid.visible = !grid.visible;
+});
+$('resetCamera').addEventListener('click', () => {
+  if (currentModel) frameObject(currentModel);
+});
+async function loadFbxBuffer(buffer, fileName) {
+  initViewer();
+  disposeModel();
+  $('empty').style.display = 'grid';
+  $('resetCamera').disabled = true;
+  $('fileName').textContent = fileName;
+  $('fileSize').textContent = (buffer.byteLength / 1048576).toFixed(2) + ' MB';
+  $('meshCount').textContent = '—';
+  $('materialCount').textContent = '—';
+  $('boneCount').textContent = '—';
+  $('details').textContent = 'Reading FBX data locally…';
+  status('Parsing FBX…');
+  try {
+    const loader = new FBXLoader(createTextureManager());
+    const model = loader.parse(buffer.slice(0), '');
+    if (!model || !model.isObject3D) throw new Error('FBXLoader did not return a valid 3D object.');
+    model.traverse(obj => {
+      obj.visible = true;
+      if (obj.isMesh) {
+        obj.frustumCulled = false;
+        if (obj.geometry) {
+          if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) obj.geometry.computeVertexNormals();
+          if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+        }
+        const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+        for (const mat of mats) {
+          mat.side = THREE.DoubleSide;
+          mat.visible = true;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+    model.updateMatrixWorld(true);
+    currentModel = model;
+    scene.add(currentModel);
+    frameObject(currentModel);
+    let meshes = 0, renderable = 0, materials = 0, bones = 0, skinnedMeshes = 0;
+    model.traverse(obj => {
+      if (obj.isMesh) {
+        meshes++;
+        if (obj.geometry && obj.geometry.attributes.position && obj.geometry.attributes.position.count) renderable++;
+        materials += Array.isArray(obj.material) ? obj.material.length : (obj.material ? 1 : 0);
+      }
+      if (obj.isSkinnedMesh) {
+        skinnedMeshes++;
+        if (obj.skeleton) bones = Math.max(bones, obj.skeleton.bones.length);
+      }
+      if (obj.isBone && !initialPose.has(obj)) initialPose.set(obj, obj.quaternion.clone());
+    });
+    $('meshCount').textContent = meshes + ' (' + renderable + ' renderable)';
+    $('materialCount').textContent = String(materials);
+    $('boneCount').textContent = String(bones);
+    $('details').textContent = 'FBX parsed. ' + skinnedMeshes + ' skinned mesh(es) detected. Mesh frustum culling is disabled for preview; materials are double-sided. Source geometry and skin weights are not edited.';
+    $('empty').style.display = 'none';
+    $('resetCamera').disabled = false;
+    $('autoTPose').disabled = bones === 0;
+    $('resetPose').disabled = bones === 0;
+    status('FBX preview ready', 'good');
+  } catch (error) {
+    console.error(error);
+    const message = error && error.message ? error.message : String(error);
+    status('FBX load failed: ' + message.slice(0, 110), 'bad');
+    $('details').textContent = 'Could not parse this FBX: ' + message;
+    $('empty').style.display = 'grid';
+  }
+}
+$('fbxFile').addEventListener('change', async event => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!/\.fbx$/i.test(file.name)) {
+    status('Please select an .fbx file.', 'bad');
+    return;
+  }
+  lastFbxName = file.name;
+  lastFbxBuffer = await file.arrayBuffer();
+  await loadFbxBuffer(lastFbxBuffer, lastFbxName);
+});
+function findBoneByAliases(model, aliases) {
+  let found = null;
+  const names = aliases.map(x => x.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  model.traverse(obj => {
+    if (!obj.isBone || found) return;
+    const n = String(obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (names.some(a => n === a || n.endsWith(a) || n.includes(a))) found = obj;
+  });
+  return found;
+}
+function rotateBoneSegment(bone, child, targetDirection) {
+  if (!bone || !child) return false;
+  bone.updateWorldMatrix(true, true);
+  const a = bone.getWorldPosition(new THREE.Vector3());
+  const b = child.getWorldPosition(new THREE.Vector3());
+  const current = b.sub(a).normalize();
+  if (current.lengthSq() < 1e-8) return false;
+  const delta = new THREE.Quaternion().setFromUnitVectors(current, targetDirection.clone().normalize());
+  const worldQ = bone.getWorldQuaternion(new THREE.Quaternion());
+  const desiredWorldQ = delta.multiply(worldQ);
+  const parentQ = bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
+  bone.quaternion.copy(parentQ.invert().multiply(desiredWorldQ));
+  bone.updateWorldMatrix(true, true);
+  return true;
+}
+$('autoTPose').addEventListener('click', () => {
+  if (!currentModel) return;
+  const lUpper = findBoneByAliases(currentModel, ['LeftArm','LeftUpperArm','UpperArm_L','UpperArmL','Bip001LUpperArm','mixamorigLeftArm','Arm_L']);
+  const rUpper = findBoneByAliases(currentModel, ['RightArm','RightUpperArm','UpperArm_R','UpperArmR','Bip001RUpperArm','mixamorigRightArm','Arm_R']);
+  const lFore = findBoneByAliases(currentModel, ['LeftForeArm','LeftLowerArm','LowerArm_L','LowerArmL','Bip001LForeArm','mixamorigLeftForeArm','Forearm_L']);
+  const rFore = findBoneByAliases(currentModel, ['RightForeArm','RightLowerArm','LowerArm_R','LowerArmR','Bip001RForeArm','mixamorigRightForeArm','Forearm_R']);
+  const lHand = findBoneByAliases(currentModel, ['LeftHand','Hand_L','HandL','Bip001LHand','mixamorigLeftHand']);
+  const rHand = findBoneByAliases(currentModel, ['RightHand','Hand_R','HandR','Bip001RHand','mixamorigRightHand']);
+  const lShoulder = findBoneByAliases(currentModel, ['LeftShoulder','Shoulder_L','Bip001LClavicle','mixamorigLeftShoulder']);
+  const rShoulder = findBoneByAliases(currentModel, ['RightShoulder','Shoulder_R','Bip001RClavicle','mixamorigRightShoulder']);
+  let lateral = new THREE.Vector3(1,0,0);
+  if (lShoulder && rShoulder) {
+    const lp = lShoulder.getWorldPosition(new THREE.Vector3());
+    const rp = rShoulder.getWorldPosition(new THREE.Vector3());
+    lateral.copy(rp.sub(lp)).normalize();
+  }
+  const leftDir = lateral.clone().negate(), rightDir = lateral.clone();
+  let changed = 0;
+  if (lUpper && lFore) changed += rotateBoneSegment(lUpper,lFore,leftDir) ? 1 : 0;
+  if (rUpper && rFore) changed += rotateBoneSegment(rUpper,rFore,rightDir) ? 1 : 0;
+  if (lFore && lHand) changed += rotateBoneSegment(lFore,lHand,leftDir) ? 1 : 0;
+  if (rFore && rHand) changed += rotateBoneSegment(rFore,rHand,rightDir) ? 1 : 0;
+  if (changed) {
+    currentModel.updateMatrixWorld(true);
+    status('Auto T-pose applied (experimental). Check arm orientation.', 'good');
+  } else {
+    status('Could not recognize arm bones. Use a model with named upper-arm, forearm and hand bones.', 'bad');
+  }
+});
+$('resetPose').addEventListener('click', () => {
+  for (const [bone, quaternion] of initialPose) bone.quaternion.copy(quaternion);
+  if (currentModel) currentModel.updateMatrixWorld(true);
+  status('Original bone rotations restored.', 'good');
+});
+</script>
+</body>
+</html>
