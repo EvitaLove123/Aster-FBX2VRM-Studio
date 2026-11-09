@@ -156,7 +156,10 @@ let textureUrls = [];
 let textureByName = new Map();
 let lastFbxBuffer = null;
 let lastFbxName = "";
-let initialPose = new Map();\nlet boneList = [];\nlet materialList = [];\nlet humanoidMapping = {};
+let initialPose = new Map();
+let boneList = [];
+let materialList = [];
+let humanoidMapping = {};
 
 function status(message, kind='') {
   statusEl.textContent = message;
@@ -283,9 +286,24 @@ $('resetCamera').addEventListener('click', () => {
   if (currentModel) frameObject(currentModel);
 });
 async function loadFbxBuffer(buffer, fileName) {
-  initViewer();
-  disposeModel();
+  // Reset all model-dependent state before attempting a new import.
   $('empty').style.display = 'grid';
+  $('exportVRM0').disabled = true;
+  $('exportVRM1').disabled = true;
+  $('resetCamera').disabled = true;
+  $('autoTPose').disabled = true;
+  $('resetPose').disabled = true;
+  humanoidMapping = {};
+  boneList = [];
+  materialList = [];
+  $('boneMappingGrid').innerHTML = '';
+  $('customBoneSelect').innerHTML = '<option value="">No model loaded</option>';
+  $('materialSelect').innerHTML = '<option value="">No materials</option>';
+  $('mappingStatus').textContent = 'Loading FBX…';
+  $('exportStatus').textContent = 'Load a model and complete required humanoid mapping to export.';
+  try {
+    initViewer();
+    disposeModel();
   $('resetCamera').disabled = true;
   $('fileName').textContent = fileName;
   $('fileSize').textContent = (buffer.byteLength / 1048576).toFixed(2) + ' MB';
@@ -345,13 +363,21 @@ async function loadFbxBuffer(buffer, fileName) {
     $('resetPose').disabled = bones === 0;
     status('FBX preview ready', 'good');
   } catch (error) {
-    console.error(error);
+    console.error('Aster FBX load error:', error);
     const message = error && error.message ? error.message : String(error);
+    disposeModel();
     $('exportVRM0').disabled = true;
     $('exportVRM1').disabled = true;
-    status('FBX load failed: ' + message.slice(0, 110), 'bad');
+    $('resetCamera').disabled = true;
+    $('autoTPose').disabled = true;
+    $('resetPose').disabled = true;
+    $('meshCount').textContent = '—';
+    $('materialCount').textContent = '—';
+    $('boneCount').textContent = '—';
     $('details').textContent = 'Could not parse this FBX: ' + message;
+    $('mappingStatus').textContent = 'FBX loading failed. Select another FBX or try again.';
     $('empty').style.display = 'grid';
+    status('FBX load failed: ' + message.slice(0, 110), 'bad');
   }
 }
 $('fbxFile').addEventListener('change', async event => {
@@ -467,7 +493,8 @@ $('exportMeta').addEventListener('click',()=>{
  const data={name:$('metaName').value,author:$('metaAuthor').value,version:$('metaVersion').value,contactInformation:$('metaContact').value,reference:$('metaReference').value,allowedUser:$('metaLicense').value,violentUsage:$('metaPermission').value,sexualUsage:$('metaSexual').value,commercialUsage:$('metaCommercial').value,redistribution:$('metaRedistribution').value,licenseName:$('metaLicenseName').value,otherLicenseUrl:$('metaOther').value};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(data.name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_metadata.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 });
-\n
+
+
 function getExportMeta() {
   const value = id => String($(id)?.value || '').trim();
   const name = value('metaName'), author = value('metaAuthor');
