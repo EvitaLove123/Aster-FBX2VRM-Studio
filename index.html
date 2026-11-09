@@ -123,6 +123,11 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <div class="formfield"><label for="alphaCutoff">Alpha cutoff</label><input id="alphaCutoff" type="number" min="0" max="1" step="0.05" value="0.5"></div>
 <div class="formfield"><label for="matSide">Face rendering</label><select id="matSide"><option value="double">Double-sided</option><option value="front">Front-sided</option><option value="back">Back-sided</option></select></div>
 </div>
+<div class="formgrid" style="margin-top:14px">
+<div class="formfield"><label for="materialTextureChannel">Texture channel</label><select id="materialTextureChannel"><option value="map">Base Color / Albedo</option><option value="normalMap">Normal</option><option value="roughnessMap">Roughness</option><option value="metalnessMap">Metallic</option><option value="emissiveMap">Emissive</option><option value="alphaMap">Alpha</option><option value="aoMap">Ambient Occlusion</option></select></div>
+<div class="formfield"><label for="materialTextureFile">Add texture to selected material</label><input id="materialTextureFile" type="file" accept="image/png,image/jpeg,image/webp" style="width:100%;font:inherit"></div>
+</div>
+<p class="sectionhint" id="materialTextureStatus">Choose a material, texture channel and image, then apply it.</p>
 <label class="checkrow"><input id="unlitToggle" type="checkbox"> Unlit preview</label>
 <button id="applyMaterial" type="button">Apply material preview</button>
 </section>
@@ -130,6 +135,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <h2>5. VRM metadata</h2>
 <p class="note">Model name and author are required for both export formats. Choose permissions carefully; they are written into the exported VRM metadata.</p>
 <div class="formgrid">
+<div class="formfield"><label for="metaThumbnail">Thumbnail (PNG/JPG, optional)</label><input id="metaThumbnail" type="file" accept="image/png,image/jpeg" style="width:100%;font:inherit"><div id="thumbnailPreview" class="sectionhint">No thumbnail selected.</div></div>
 <div class="formfield"><label for="metaName">Model name *</label><input id="metaName" type="text" placeholder="Model name"></div>
 <div class="formfield"><label for="metaAuthor">Author *</label><input id="metaAuthor" type="text" placeholder="Creator name"></div>
 <div class="formfield"><label for="metaVersion">Version</label><input id="metaVersion" type="text" value="1.0"></div>
@@ -152,6 +158,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <button id="exportVRM0" type="button" disabled>Download VRM 0.x</button>
 <button id="exportVRM1" type="button" disabled>Download VRM 1.0</button>
 </div>
+<div class="formfield" style="margin-top:12px"><label for="exportTextureSize">Texture size limit for faster loading</label><select id="exportTextureSize"><option value="1024">1024 px · Smallest file</option><option value="2048" selected>2048 px · Recommended</option><option value="4096">4096 px · Highest detail</option></select><p class="sectionhint">Large source textures are resized during export. This can reduce VRM size and app loading time, but may reduce texture detail.</p></div>
 <div id="exportStatus" class="sectionhint">Load a model and complete required humanoid mapping to export.</div>
 </section>
 <section class="card">
@@ -164,6 +171,9 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <li>Three.js 3D scene with lighting, grid, axes, and responsive resize</li>
 <li>Orbit, zoom, pan, automatic framing, and camera reset</li>
 <li>Basic mesh, material, and skeleton inspection</li>
+<li>Manual material texture assignment for base color, normal, roughness, metallic, emissive, alpha and ambient occlusion</li>
+<li>Improved scored Humanoid and Finger Auto Mapping with unique bone assignment and missing-bone report</li>
+<li>Optional VRM 0.x / 1.0 thumbnail embedding and export texture-size limit</li>
 </ul>
 <p class="note">This is an early FBX-to-VRM exporter. It writes a GLB binary with a VRM 0.x or VRM 1.0 core extension, based on the mapped humanoid skeleton. Advanced VRM features are not yet included; validate each exported model in a VRM validator and target app.</p>
 </section>
@@ -180,6 +190,9 @@ const statusEl = $('status');
 let renderer, scene, camera, controls, currentModel, grid, axes;
 let textureUrls = [];
 let textureByName = new Map();
+let assignedTextureUrls = [];
+let thumbnailFile = null;
+let thumbnailPreviewUrl = null;
 let lastFbxBuffer = null;
 let lastFbxName = "";
 let initialPose = new Map();
@@ -377,6 +390,8 @@ function disposeModel() {
     }
   });
   currentModel = null;
+  for (const url of assignedTextureUrls) URL.revokeObjectURL(url);
+  assignedTextureUrls = [];
   initialPose.clear();
   $('autoTPose').disabled = true;
   $('resetPose').disabled = true;
@@ -550,52 +565,154 @@ $('fbxFile').addEventListener('change', async event => {
 });
 
 const humanoidSlots = [
- ['hips',['hips','pelvis','bip001pelvis']],['spine',['spine','spine1','lowerback']],
- ['chest',['chest','spine2','spine2']],['upperChest',['upperchest','spine3']],
- ['neck',['neck']],['head',['head']],
- ['leftShoulder',['leftshoulder','lclavicle','bip001lclavicle']],['leftUpperArm',['leftupperarm','leftarm','luparm','bip001lupperarm']],
- ['leftLowerArm',['leftlowerarm','leftforearm','lforearm','bip001lforearm']],['leftHand',['lefthand','lhand','bip001lhand']],
- ['rightShoulder',['rightshoulder','rclavicle','bip001rclavicle']],['rightUpperArm',['rightupperarm','rightarm','ruparm','bip001rupperarm']],
- ['rightLowerArm',['rightlowerarm','rightforearm','rforearm','bip001rforearm']],['rightHand',['righthand','rhand','bip001rhand']],
- ['leftUpperLeg',['leftupleg','leftthigh','lupleg','bip001lthigh']],['leftLowerLeg',['leftlowerleg','leftcalf','lleg','bip001lcalf']],['leftFoot',['leftfoot','bip001lfoot']],['leftToes',['lefttoebase','lefttoes']],
- ['rightUpperLeg',['rightupleg','rightthigh','rupleg','bip001rthigh']],['rightLowerLeg',['rightlowerleg','rightcalf','rleg','bip001rcalf']],['rightFoot',['rightfoot','bip001rfoot']],['rightToes',['righttoebase','righttoes']]
+ ['hips',['hips','pelvis','bip001pelvis','rootpelvis']],
+ ['spine',['spine','spine1','spine01','lowerback','abdomen']],
+ ['chest',['chest','spine2','spine02','upperbody']],
+ ['upperChest',['upperchest','spine3','spine03','upperchest']],
+ ['neck',['neck']],
+ ['head',['head']],
+ ['leftEye',['lefteye','eye_l','eyel']],
+ ['rightEye',['righteye','eye_r','eyer']],
+ ['jaw',['jaw','mandible']],
+ ['leftShoulder',['leftshoulder','lshoulder','lclavicle','bip001lclavicle','shoulder_l']],
+ ['leftUpperArm',['leftupperarm','leftarm','luparm','bip001lupperarm','upperarm_l','arm_l']],
+ ['leftLowerArm',['leftlowerarm','leftforearm','lforearm','bip001lforearm','lowerarm_l','forearm_l']],
+ ['leftHand',['lefthand','lhand','bip001lhand','hand_l']],
+ ['rightShoulder',['rightshoulder','rshoulder','rclavicle','bip001rclavicle','shoulder_r']],
+ ['rightUpperArm',['rightupperarm','rightarm','ruparm','bip001rupperarm','upperarm_r','arm_r']],
+ ['rightLowerArm',['rightlowerarm','rightforearm','rforearm','bip001rforearm','lowerarm_r','forearm_r']],
+ ['rightHand',['righthand','rhand','bip001rhand','hand_r']],
+ ['leftUpperLeg',['leftupleg','leftthigh','lupleg','bip001lthigh','thigh_l','upleg_l']],
+ ['leftLowerLeg',['leftlowerleg','leftcalf','lleg','bip001lcalf','calf_l','shin_l','lowerleg_l']],
+ ['leftFoot',['leftfoot','bip001lfoot','foot_l']],
+ ['leftToes',['lefttoebase','lefttoes','toes_l','toe_l']],
+ ['rightUpperLeg',['rightupleg','rightthigh','rupleg','bip001rthigh','thigh_r','upleg_r']],
+ ['rightLowerLeg',['rightlowerleg','rightcalf','rleg','bip001rcalf','calf_r','shin_r','lowerleg_r']],
+ ['rightFoot',['rightfoot','bip001rfoot','foot_r']],
+ ['rightToes',['righttoebase','righttoes','toes_r','toe_r']]
 ];
 const fingerNames=['Thumb','Index','Middle','Ring','Little'];
 for(const side of ['Left','Right']) for(const finger of fingerNames) for(let seg=1;seg<=3;seg++){
- const slot=side.toLowerCase()+finger+(['Proximal','Intermediate','Distal'][seg-1]);
- const segmentName=seg===1?'Proximal':seg===2?'Intermediate':'Distal';
- const aliases=[side+finger+segmentName,side+finger+seg,side[0].toLowerCase()+finger+seg,finger+segmentName+'_'+side[0]+'_'+seg,finger+'Finger'+seg+'_'+side[0],finger+seg+'_'+side[0],side[0]+'_'+finger+seg,finger+'_'+side[0]+'_'+seg];
+ const segmentName=['Proximal','Intermediate','Distal'][seg-1];
+ const shortSide=side==='Left'?'L':'R';
+ const slot=side.toLowerCase()+finger+segmentName;
+ const aliases=[
+  side+finger+segmentName, side+finger+seg,
+  'mixamorig'+side+'Hand'+finger+seg,
+  side+'Hand'+finger+seg,
+  finger+segmentName+'_'+shortSide+'_'+seg,
+  finger+segmentName+'_'+shortSide,
+  finger+'Finger'+seg+'_'+shortSide,
+  finger+seg+'_'+shortSide,
+  shortSide+'_'+finger+seg,
+  finger+'_'+shortSide+'_'+seg,
+  finger+segmentName+shortSide+seg
+ ];
  humanoidSlots.push([slot,aliases]);
 }
-function normBone(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
+function normBone(v){return String(v||'').toLowerCase().replace(/mixamorig|bip001|armature|skeleton|rootnode|def_|org_|mch_|j_bip_/g,'').replace(/[^a-z0-9]/g,'');}
+function escapeOption(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function slotFingerInfo(slot){
+ const m=slot.match(/^(left|right)(thumb|index|middle|ring|little)(proximal|intermediate|distal)$/i);
+ return m?{side:m[1].toLowerCase(),finger:m[2].toLowerCase(),segment:m[3].toLowerCase()}:null;
+}
+function fingerScore(name,slot){
+ const info=slotFingerInfo(slot); if(!info)return 0;
+ const raw=String(name||'').toLowerCase();
+ const n=normBone(raw);
+ const fingerAliases={thumb:['thumb','pollex'],index:['index','forefinger'],middle:['middle'],ring:['ring'],little:['little','pinky','pinkie']};
+ if(!fingerAliases[info.finger].some(x=>n.includes(x)))return 0;
+ const left=/(left|_l\b|\.l\b|-l\b|^l(?=[a-z])|l[0-9]$)/i.test(raw)||/l$/i.test(n);
+ const right=/(right|_r\b|\.r\b|-r\b|^r(?=[a-z])|r[0-9]$)/i.test(raw)||/r$/i.test(n);
+ if(info.side==='left'&&right&&!left)return 0;
+ if(info.side==='right'&&left&&!right)return 0;
+ if(!left&&!right){
+  const sideMarker=info.side==='left'?/(^|[^a-z])l([^a-z]|$)/i.test(raw):/(^|[^a-z])r([^a-z]|$)/i.test(raw);
+  if(!sideMarker)return 0;
+ }
+ const segmentMarkers={
+  proximal:['proximal','proxim','base','01','1'],
+  intermediate:['intermediate','intermed','medial','middle','02','2'],
+  distal:['distal','tip','03','3']
+ }[info.segment];
+ if(!segmentMarkers.some(x=>n.includes(x)))return 0;
+ let score=82;
+ if(n.includes(info.segment))score+=12;
+ if(n.includes(info.side))score+=3;
+ if(/hand/.test(n))score+=2;
+ return score;
+}
+function boneScore(bone,slot,aliases){
+ const name=String(bone.name||'');
+ const n=normBone(name);
+ const finger=fingerScore(name,slot);
+ if(finger)return finger;
+ let best=0;
+ for(const alias of aliases){
+  const a=normBone(alias);
+  if(!a)continue;
+  if(n===a)best=Math.max(best,100);
+  else if(n.endsWith(a))best=Math.max(best,91);
+  else if(a.length>=5&&n.includes(a))best=Math.max(best,78);
+ }
+ const side=slot.startsWith('left')?'left':slot.startsWith('right')?'right':'';
+ if(side){
+  const other=side==='left'?'right':'left';
+  if(n.includes(other))return 0;
+  if(n.includes(side))best+=3;
+  const short=side==='left'?'l':'r';
+  if(new RegExp('(^|[^a-z])'+short+'([^a-z]|$)','i').test(name))best+=1;
+ }
+ if(slot==='hips'&&/(^|_)root($|_)/i.test(name))best=Math.max(best,30);
+ return best;
+}
 function populateBoneTools(){
  boneList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isBone) boneList.push(o);});
- const opts='<option value="">— Not mapped —</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+(b.name||'Bone '+i)+'</option>').join('');
- $('customBoneSelect').innerHTML='<option value="">Select a bone…</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+(b.name||'Bone '+i)+'</option>').join('');
+ const opts='<option value="">— Not mapped —</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+escapeOption(b.name||'Bone '+i)+'</option>').join('');
+ $('customBoneSelect').innerHTML='<option value="">Select a bone…</option>'+boneList.map((b,i)=>'<option value="'+i+'">'+escapeOption(b.name||'Bone '+i)+'</option>').join('');
  $('boneMappingGrid').innerHTML='';
  for(const [slot] of humanoidSlots){
   const wrap=document.createElement('div');wrap.className='formfield';
   const label=document.createElement('label');label.textContent=slot;
   const select=document.createElement('select');select.dataset.slot=slot;select.innerHTML=opts;
   select.value=humanoidMapping[slot]??'';
-  select.addEventListener('change',()=>{humanoidMapping[slot]=select.value;});
+  select.addEventListener('change',()=>{humanoidMapping[slot]=select.value;updateMappingSummary();});
   wrap.append(label,select);$('boneMappingGrid').appendChild(wrap);
  }
  $('autoMap').disabled=!boneList.length;$('clearMap').disabled=!boneList.length;
+ updateMappingSummary();
+}
+function updateMappingSummary(){
+ const mapped=Object.keys(humanoidMapping).filter(k=>humanoidMapping[k]!==''&&humanoidMapping[k]!=null);
+ const missing=requiredHumanoidBones.filter(k=>!mapped.includes(k));
+ const duplicates=new Map();
+ for(const [slot,index] of Object.entries(humanoidMapping)){if(index===''||index==null)continue;duplicates.set(index,(duplicates.get(index)||[]).concat(slot));}
+ const collisions=[...duplicates.values()].filter(v=>v.length>1);
+ $('mappingStatus').textContent='Mapped '+mapped.length+' / '+humanoidSlots.length+' slots · Required bones missing: '+(missing.length?missing.join(', '):'none')+' · Duplicate assignments: '+collisions.length;
 }
 function autoMapBones(){
  humanoidMapping={};
- for(const [slot,aliases] of humanoidSlots){
-  let idx=-1;
+ const used=new Set();
+ const ordered=humanoidSlots.slice().sort((a,b)=>{
+  const ar=requiredHumanoidBones.includes(a[0])?0:1;
+  const br=requiredHumanoidBones.includes(b[0])?0:1;
+  return ar-br;
+ });
+ for(const [slot,aliases] of ordered){
+  let bestIndex=-1,bestScore=0;
   for(let i=0;i<boneList.length;i++){
-   const n=normBone(boneList[i].name);
-   if(aliases.some(a=>{const x=normBone(a);return n===x||n.endsWith(x)||n.includes(x); })){idx=i;break;}
+   if(used.has(i))continue;
+   const score=boneScore(boneList[i],slot,aliases);
+   if(score>bestScore){bestScore=score;bestIndex=i;}
   }
-  if(idx>=0) humanoidMapping[slot]=String(idx);
+  if(bestIndex>=0&&bestScore>=65){
+   humanoidMapping[slot]=String(bestIndex);
+   used.add(bestIndex);
+  }
  }
  populateBoneTools();
- const mapped=Object.keys(humanoidMapping).length;
- $('mappingStatus').textContent='Auto-mapped '+mapped+' / '+humanoidSlots.length+' humanoid slots. Please review possible false matches and manually select missing bones.';
+ const missing=requiredHumanoidBones.filter(name=>humanoidMapping[name]===undefined);
+ $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'Still required: '+missing.join(', ')+'.':'All required bones detected.')+' Please inspect the assignments; ambiguous/custom rig names may need manual mapping.';
 }
 function populateMaterials(){
  materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,originalMaterial:m,slot:i,isArray:Array.isArray(o.material),label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
@@ -612,6 +729,31 @@ function loadMaterialControls(){
  $('unlitToggle').checked=!!m.userData.asterUnlit;
 }
 $('materialSelect').addEventListener('change',loadMaterialControls);
+$('materialTextureFile').addEventListener('change',()=>{
+ const file=$('materialTextureFile').files&&$('materialTextureFile').files[0];
+ if(!file)return;
+ const entry=materialList[Number($('materialSelect').value)||0];
+ if(!entry){$('materialTextureStatus').textContent='Select a material first.';return;}
+ const channel=$('materialTextureChannel').value;
+ const url=URL.createObjectURL(file);
+ assignedTextureUrls.push(url);
+ const loader=new THREE.TextureLoader();
+ loader.load(url,texture=>{
+  texture.name=file.name;
+  if(channel==='map'||channel==='emissiveMap')texture.colorSpace=THREE.SRGBColorSpace;
+  texture.needsUpdate=true;
+  const old=entry.material[channel];
+  if(old&&old.dispose)old.dispose();
+  entry.material[channel]=texture;
+  entry.material.needsUpdate=true;
+  $('materialTextureStatus').textContent='Applied '+file.name+' to '+entry.label+' · '+channel+'.';
+  $('materialTextureFile').value='';
+  status('Material texture assigned.', 'good');
+ },undefined,error=>{
+  console.error(error);
+  $('materialTextureStatus').textContent='Could not load texture: '+(error.message||error);
+ });
+});
 $('applyMaterial').addEventListener('click',()=>{
  const e=materialList[Number($('materialSelect').value)||0];if(!e)return;const m=e.material;
  if(m.color)m.color.set($('matColor').value);
@@ -636,6 +778,35 @@ $('applyMaterial').addEventListener('click',()=>{
 $('autoMap').addEventListener('click',autoMapBones);
 $('clearMap').addEventListener('click',()=>{humanoidMapping={};populateBoneTools();$('mappingStatus').textContent='All mapping assignments cleared.';});
 $('customBoneSelect').addEventListener('change',()=>{const i=Number($('customBoneSelect').value);if(Number.isInteger(i)&&boneList[i])$('mappingStatus').textContent='Selected additional bone: '+boneList[i].name;});
+$('metaThumbnail').addEventListener('change',()=>{
+ const file=$('metaThumbnail').files&&$('metaThumbnail').files[0];
+ if(thumbnailPreviewUrl)URL.revokeObjectURL(thumbnailPreviewUrl);
+ thumbnailFile=file||null;thumbnailPreviewUrl=null;
+ if(file){
+  if(!['image/png','image/jpeg'].includes(file.type)){
+   thumbnailFile=null;$('metaThumbnail').value='';
+   $('thumbnailPreview').textContent='Only PNG or JPG thumbnails are supported.';
+   return;
+  }
+  thumbnailPreviewUrl=URL.createObjectURL(file);
+  $('thumbnailPreview').innerHTML='';
+  const img=document.createElement('img');img.src=thumbnailPreviewUrl;img.alt='VRM thumbnail preview';img.style.cssText='width:112px;height:112px;object-fit:cover;border-radius:12px;border:1px solid var(--line)';
+  $('thumbnailPreview').appendChild(img);
+ }else $('thumbnailPreview').textContent='No thumbnail selected.';
+});
+async function makeThumbnailPayload(file){
+ if(!file)return null;
+ if(!['image/png','image/jpeg'].includes(file.type))throw new Error('Thumbnail must be PNG or JPG.');
+ const bitmap=await createImageBitmap(file);
+ const size=1024,canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;
+ const ctx=canvas.getContext('2d');
+ const crop=Math.min(bitmap.width,bitmap.height);
+ const sx=(bitmap.width-crop)/2,sy=(bitmap.height-crop)/2;
+ if(file.type==='image/jpeg'){ctx.fillStyle='#ffffff';ctx.fillRect(0,0,size,size);}
+ ctx.drawImage(bitmap,sx,sy,crop,crop,0,0,size,size);bitmap.close();
+ const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not encode thumbnail.')),file.type,file.type==='image/jpeg'?0.9:undefined));
+ return {bytes:new Uint8Array(await blob.arrayBuffer()),mimeType:blob.type};
+}
 $('exportMeta').addEventListener('click',()=>{
  const data={name:$('metaName').value,author:$('metaAuthor').value,version:$('metaVersion').value,contactInformation:$('metaContact').value,reference:$('metaReference').value,allowedUser:$('metaLicense').value,violentUsage:$('metaPermission').value,sexualUsage:$('metaSexual').value,commercialUsage:$('metaCommercial').value,redistribution:$('metaRedistribution').value,licenseName:$('metaLicenseName').value,otherLicenseUrl:$('metaOther').value};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(data.name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_metadata.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -685,34 +856,56 @@ function buildHumanoid(version, nodeMap) {
   for (const [bone,node] of Object.entries(mapped)) humanBones[bone] = {node};
   return {humanBones};
 }
-function glbWithVRMExtension(arrayBuffer, extensionName, extensionValue) {
-  const view = new DataView(arrayBuffer);
-  if (view.getUint32(0,true)!==0x46546c67 || view.getUint32(4,true)!==2) throw new Error('GLTFExporter did not return a valid GLB 2.0 binary.');
-  const total = view.getUint32(8,true);
-  let offset=12, json=null, binaryChunks=[];
+function glbWithVRMExtension(arrayBuffer, extensionName, extensionValue, extraImage=null) {
+  const view=new DataView(arrayBuffer);
+  if(view.getUint32(0,true)!==0x46546c67||view.getUint32(4,true)!==2)throw new Error('GLTFExporter did not return a valid GLB 2.0 binary.');
+  const total=view.getUint32(8,true);
+  let offset=12,json=null;
+  const chunks=[];
   while(offset<total){
-    const length=view.getUint32(offset,true), type=view.getUint32(offset+4,true), start=offset+8;
-    if(type===0x4e4f534a){
-      const bytes=new Uint8Array(arrayBuffer,start,length);
-      json=JSON.parse(new TextDecoder().decode(bytes).replace(/\u0000+$/g,'').trim());
-    }else{
-      binaryChunks.push({type,bytes:new Uint8Array(arrayBuffer,start,length)});
-    }
+    const length=view.getUint32(offset,true),type=view.getUint32(offset+4,true),start=offset+8;
+    const bytes=new Uint8Array(arrayBuffer,start,length);
+    if(type===0x4e4f534a)json=JSON.parse(new TextDecoder().decode(bytes).replace(/\u0000+$/g,'').trim());
+    else chunks.push({type,bytes});
     offset=start+length;
   }
-  if(!json) throw new Error('GLB JSON chunk was not found.');
+  if(!json)throw new Error('GLB JSON chunk was not found.');
+  if(extraImage){
+    let bin=chunks.find(c=>c.type===0x004e4942);
+    if(!bin)throw new Error('GLB binary buffer chunk was not found for the thumbnail.');
+    const oldBytes=bin.bytes;
+    const alignedOffset=Math.ceil(oldBytes.length/4)*4;
+    const combined=new Uint8Array(alignedOffset+extraImage.bytes.length);
+    combined.set(oldBytes,0);combined.set(extraImage.bytes,alignedOffset);
+    json.bufferViews=json.bufferViews||[];
+    json.images=json.images||[];
+    const imageIndex=json.images.length;
+    const viewIndex=json.bufferViews.length;
+    json.bufferViews.push({buffer:0,byteOffset:alignedOffset,byteLength:extraImage.bytes.length});
+    json.images.push({name:'VRM Thumbnail',mimeType:extraImage.mimeType,bufferView:viewIndex});
+    json.buffers=json.buffers||[{byteLength:oldBytes.length}];
+    json.buffers[0].byteLength=combined.length;
+    bin.bytes=combined;
+    if(extensionName==='VRMC_vrm'){
+      extensionValue.meta.thumbnailImage=imageIndex;
+    }else{
+      json.textures=json.textures||[];
+      const textureIndex=json.textures.length;
+      json.textures.push({source:imageIndex});
+      extensionValue.meta.texture=textureIndex;
+    }
+  }
   json.extensions=json.extensions||{};
   json.extensions[extensionName]=extensionValue;
   json.extensionsUsed=Array.from(new Set([...(json.extensionsUsed||[]),extensionName]));
   json.extensionsRequired=Array.from(new Set([...(json.extensionsRequired||[]),extensionName]));
   const jsonBytes=new TextEncoder().encode(JSON.stringify(json));
-  const jsonLength=Math.ceil(jsonBytes.length/4)*4;
-  const chunks=[{type:0x4e4f534a,bytes:jsonBytes,length:jsonLength},...binaryChunks.map(c=>({type:c.type,bytes:c.bytes,length:Math.ceil(c.bytes.length/4)*4}))];
-  const outLength=12+chunks.reduce((n,c)=>n+8+c.length,0);
-  const out=new ArrayBuffer(outLength), outView=new DataView(out);
+  const chunksOut=[{type:0x4e4f534a,bytes:jsonBytes,length:Math.ceil(jsonBytes.length/4)*4},...chunks.map(c=>({type:c.type,bytes:c.bytes,length:Math.ceil(c.bytes.length/4)*4}))];
+  const outLength=12+chunksOut.reduce((n,c)=>n+8+c.length,0);
+  const out=new ArrayBuffer(outLength),outView=new DataView(out);
   outView.setUint32(0,0x46546c67,true);outView.setUint32(4,2,true);outView.setUint32(8,outLength,true);
   let p=12;
-  for(const chunk of chunks){
+  for(const chunk of chunksOut){
     outView.setUint32(p,chunk.length,true);outView.setUint32(p+4,chunk.type,true);p+=8;
     new Uint8Array(out,p,chunk.length).fill(chunk.type===0x4e4f534a?0x20:0);
     new Uint8Array(out,p,chunk.bytes.length).set(chunk.bytes);p+=chunk.length;
@@ -742,7 +935,10 @@ async function exportVRM(version) {
     button.disabled=true;button.textContent='Exporting…';
     $('exportStatus').textContent='Building GLB and writing VRM '+(version==='0'?'0.x':'1.0')+' extension…';
     const exporter=new GLTFExporter();
-    const glb=await exporter.parseAsync(currentModel,{binary:true,trs:true,onlyVisible:false,includeCustomExtensions:true,maxTextureSize:4096});
+    const maxTextureSize=Number($('exportTextureSize').value)||2048;
+    $('exportStatus').textContent='Preparing textures (maximum '+maxTextureSize+' px), mesh data and VRM metadata…';
+    const glb=await exporter.parseAsync(currentModel,{binary:true,trs:true,onlyVisible:false,includeCustomExtensions:true,maxTextureSize});
+    const thumbnail=await makeThumbnailPayload(thumbnailFile);
     const jsonView=new DataView(glb);
     let jsonChunk=null,offset=12;
     while(offset<jsonView.getUint32(8,true)){
@@ -753,7 +949,7 @@ async function exportVRM(version) {
     if(!jsonChunk) throw new Error('Could not read exported GLB JSON.');
     const ext=createVrmExtension(version,jsonChunk);
     const extensionName=version==='0'?'VRM':'VRMC_vrm';
-    const result=glbWithVRMExtension(glb,extensionName,ext[extensionName]);
+    const result=glbWithVRMExtension(glb,extensionName,ext[extensionName],thumbnail);
     const blob=new Blob([result],{type:'model/gltf-binary'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -761,7 +957,7 @@ async function exportVRM(version) {
     a.download=(getExportMeta().name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_VRM'+(version==='0'?'0':'1')+'.vrm';
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
-    $('exportStatus').textContent='VRM '+(version==='0'?'0.x':'1.0')+' file generated. Please validate it in a VRM validator and test it in your target app.';
+    $('exportStatus').textContent='VRM '+(version==='0'?'0.x':'1.0')+' generated · '+(blob.size/1048576).toFixed(2)+' MB · texture limit '+maxTextureSize+' px'+(thumbnail?' · thumbnail embedded':'')+'. Please validate and test in your target app.';
     status('VRM '+(version==='0'?'0.x':'1.0')+' export generated.','good');
   } catch(error) {
     console.error(error);
