@@ -106,7 +106,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 </section>
 <section class="card">
 <h2>3. Humanoid & finger mapping</h2>
-<p class="note">Map bones before exporting. VRM export requires the core humanoid bones; review Auto-Mapping before downloading.</p>
+<p class="note">Map bones before exporting. VRM 0.x additionally requires chest and neck; VRM 1.0 uses the core required humanoid set. Review Auto-Mapping before downloading.</p>
 <div class="toolbar"><button id="autoMap" type="button" disabled>Auto-map humanoid + fingers</button><button id="clearMap" class="secondary" type="button" disabled>Clear mapping</button></div>
 <div id="mappingStatus" class="sectionhint">Load an FBX model to detect bones.</div>
 <div id="boneMappingGrid" class="formgrid" style="margin-top:12px"></div>
@@ -153,7 +153,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 </section>
 <section class="card">
 <h2>6. VRM export</h2>
-<p class="note">Exports a binary GLB container with VRM extension data and the .vrm file extension. Core humanoid mapping is required. Advanced features such as MToon authoring, expressions, first-person mesh annotations, SpringBone and colliders are not yet included.</p>
+<p class="note">Exports a binary GLB container with VRM extension data and the .vrm file extension. A structural preflight checks the GLB container, metadata, required humanoid bones and node references before download. This is not a substitute for an official VRM schema validator or target-app testing. Advanced features such as MToon authoring, expressions, first-person mesh annotations, SpringBone and colliders are not yet included.</p>
 <div class="toolbar">
 <button id="exportVRM0" type="button" disabled>Download VRM 0.x</button>
 <button id="exportVRM1" type="button" disabled>Download VRM 1.0</button>
@@ -174,6 +174,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <li>Manual material texture assignment for base color, normal, roughness, metallic, emissive, alpha and ambient occlusion</li>
 <li>Improved scored Humanoid and Finger Auto Mapping with unique bone assignment and missing-bone report</li>
 <li>Optional VRM 0.x / 1.0 thumbnail embedding and export texture-size limit</li>
+<li>Pre-download structural validation for VRM 0.x / 1.0 GLB containers, metadata, humanoid nodes and skin references</li>
 </ul>
 <p class="note">This is an early FBX-to-VRM exporter. It writes a GLB binary with a VRM 0.x or VRM 1.0 core extension, based on the mapped humanoid skeleton. Advanced VRM features are not yet included; validate each exported model in a VRM validator and target app.</p>
 </section>
@@ -183,6 +184,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { validateVrmGlb } from './vrm-preflight.mjs';
 
 const $ = id => document.getElementById(id);
 const viewport = $('viewport');
@@ -692,18 +694,19 @@ function populateBoneTools(){
 }
 function updateMappingSummary(){
  const mapped=Object.keys(humanoidMapping).filter(k=>humanoidMapping[k]!==''&&humanoidMapping[k]!=null);
- const missing=requiredHumanoidBones.filter(k=>!mapped.includes(k));
+ const missing0=requiredHumanoidBonesVrm0.filter(k=>!mapped.includes(k));
+ const missing1=requiredHumanoidBonesVrm1.filter(k=>!mapped.includes(k));
  const duplicates=new Map();
  for(const [slot,index] of Object.entries(humanoidMapping)){if(index===''||index==null)continue;duplicates.set(index,(duplicates.get(index)||[]).concat(slot));}
  const collisions=[...duplicates.values()].filter(v=>v.length>1);
- $('mappingStatus').textContent='Mapped '+mapped.length+' / '+humanoidSlots.length+' slots · Required bones missing: '+(missing.length?missing.join(', '):'none')+' · Duplicate assignments: '+collisions.length;
+ $('mappingStatus').textContent='Mapped '+mapped.length+' / '+humanoidSlots.length+' slots · VRM 0.x missing: '+(missing0.length?missing0.join(', '):'none')+' · VRM 1.0 missing: '+(missing1.length?missing1.join(', '):'none')+' · Duplicate assignments: '+collisions.length;
 }
 function autoMapBones(){
  humanoidMapping={};
  const used=new Set();
  const ordered=humanoidSlots.slice().sort((a,b)=>{
-  const ar=requiredHumanoidBones.includes(a[0])?0:1;
-  const br=requiredHumanoidBones.includes(b[0])?0:1;
+  const ar=requiredHumanoidBonesVrm0.includes(a[0])?0:1;
+  const br=requiredHumanoidBonesVrm0.includes(b[0])?0:1;
   return ar-br;
  });
  for(const [slot,aliases] of ordered){
@@ -719,8 +722,9 @@ function autoMapBones(){
   }
  }
  populateBoneTools();
- const missing=requiredHumanoidBones.filter(name=>humanoidMapping[name]===undefined);
- $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'Still required: '+missing.join(', ')+'.':'All required bones detected.')+' Please inspect the assignments; ambiguous/custom rig names may need manual mapping.';
+ const missing0=requiredHumanoidBonesVrm0.filter(name=>humanoidMapping[name]===undefined);
+ const missing1=requiredHumanoidBonesVrm1.filter(name=>humanoidMapping[name]===undefined);
+ $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. VRM 0.x missing: '+(missing0.length?missing0.join(', '):'none')+' · VRM 1.0 missing: '+(missing1.length?missing1.join(', '):'none')+'. Please inspect assignments; custom rigs may need manual mapping.';
 }
 function populateMaterials(){
  materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,originalMaterial:m,slot:i,isArray:Array.isArray(o.material),label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
@@ -830,7 +834,9 @@ function getExportMeta() {
   if (!name || !author) throw new Error('Please enter both Model name and Author in the VRM metadata section.');
   return {name,author,version:value('metaVersion')||'1.0',contact:value('metaContact'),reference:value('metaReference'),allowed:value('metaLicense'),violent:value('metaPermission'),sexual:value('metaSexual'),commercial:value('metaCommercial'),license:value('metaLicenseName')||value('metaRedistribution'),other:value('metaOther')};
 }
-const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+const requiredHumanoidBonesVrm1 = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+const requiredHumanoidBonesVrm0 = [...requiredHumanoidBonesVrm1,'chest','neck'];
+function requiredHumanoidBonesForVersion(version){return version==='0'?requiredHumanoidBonesVrm0:requiredHumanoidBonesVrm1;}
 function buildNodeIndexMap(gltfJson) {
   const byName = new Map();
   (gltfJson.nodes || []).forEach((node,index) => {
@@ -856,7 +862,8 @@ function buildHumanoid(version, nodeMap) {
     if (node === undefined) throw new Error('Could not find exported glTF node for mapped bone: '+bone.name+'. Check for duplicate or empty bone names.');
     mapped[slot] = node;
   }
-  const missing = requiredHumanoidBones.filter(name => mapped[name] === undefined);
+  const requiredBones = requiredHumanoidBonesForVersion(version);
+  const missing = requiredBones.filter(name => mapped[name] === undefined);
   if (missing.length) throw new Error('Required humanoid bones are missing: '+missing.join(', ')+'. Complete the mapping first.');
   const nodeValues = Object.values(mapped);
   if (new Set(nodeValues).size !== nodeValues.length) throw new Error('The same bone is assigned to more than one humanoid slot. Correct the mapping.');
@@ -961,6 +968,7 @@ async function exportVRM(version) {
     const ext=createVrmExtension(version,jsonChunk);
     const extensionName=version==='0'?'VRM':'VRMC_vrm';
     const result=glbWithVRMExtension(glb,extensionName,ext[extensionName],thumbnail);
+    const validation=validateVrmGlb(result,version);
     const blob=new Blob([result],{type:'model/gltf-binary'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -968,8 +976,9 @@ async function exportVRM(version) {
     a.download=(getExportMeta().name||'Aster_Model').replace(/[^a-z0-9_-]/gi,'_')+'_VRM'+(version==='0'?'0':'1')+'.vrm';
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
-    $('exportStatus').textContent='VRM '+(version==='0'?'0.x':'1.0')+' generated · '+(blob.size/1048576).toFixed(2)+' MB · texture limit '+maxTextureSize+' px'+(thumbnail?' · thumbnail embedded':'')+'. Please validate and test in your target app.';
-    status('VRM '+(version==='0'?'0.x':'1.0')+' export generated.','good');
+    const warningText=validation.warnings.length?' · Warnings: '+validation.warnings.join(' '):'';
+    $('exportStatus').textContent='Structural preflight passed ('+validation.checks.length+' checks) · VRM '+(version==='0'?'0.x':'1.0')+' generated · '+(blob.size/1048576).toFixed(2)+' MB · texture limit '+maxTextureSize+' px'+(thumbnail?' · thumbnail embedded':'')+warningText+'. Still test in your target app.';
+    status('VRM '+(version==='0'?'0.x':'1.0')+' export generated; structural preflight passed.',validation.warnings.length?'':'good');
   } catch(error) {
     console.error(error);
     $('exportStatus').textContent='Export failed: '+(error.message||String(error));
