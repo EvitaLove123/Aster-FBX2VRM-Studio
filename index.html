@@ -834,15 +834,16 @@ function getExportMeta() {
   return {name,author,version:value('metaVersion')||'1.0',contact:value('metaContact'),reference:value('metaReference'),allowed:value('metaLicense'),violent:value('metaPermission'),sexual:value('metaSexual'),commercial:value('metaCommercial'),license:value('metaLicenseName')||value('metaRedistribution'),other:value('metaOther')};
 }
 const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
-function getHumanoidObjects() {
+function getHumanoidObjects(version) {
   const mapped = {};
   for (const [slot, indexText] of Object.entries(humanoidMapping)) {
     if (indexText === '' || indexText == null) continue;
     const bone = boneList[Number(indexText)];
     if (bone) mapped[slot] = bone;
   }
-  const missing = requiredHumanoidBones.filter(name => !mapped[name]);
-  if (missing.length) throw new Error('Required humanoid bones are missing: ' + missing.join(', ') + '. Complete mapping first.');
+  const required = version === '0' ? ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'] : requiredHumanoidBones;
+  const missing = required.filter(name => !mapped[name]);
+  if (missing.length) throw new Error('Required VRM ' + (version === '0' ? '0.x' : '1.0') + ' humanoid bones are missing: ' + missing.join(', ') + '. Complete mapping first.');
   const assigned = Object.values(mapped);
   if (new Set(assigned).size !== assigned.length) throw new Error('One bone is assigned to multiple humanoid slots. Correct the mapping.');
   return mapped;
@@ -882,7 +883,7 @@ async function exportVRM(version) {
   try {
     if (!currentModel) throw new Error('Load an FBX model first.');
     const meta = getExportMeta();
-    const humanoid = getHumanoidObjects();
+    const humanoid = getHumanoidObjects(version);
     const maxTextureSize = Number($('exportTextureSize').value) || 2048;
     const thumbnailPayload = await makeThumbnailPayload(thumbnailFile);
     const thumbnail = thumbnailPayload ? new Blob([thumbnailPayload.bytes], { type: thumbnailPayload.mimeType }) : null;
