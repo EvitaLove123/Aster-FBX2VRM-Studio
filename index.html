@@ -348,8 +348,8 @@ function initViewer() {
   scene.background = new THREE.Color(0xeaf0f8);
   camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100000);
   camera.position.set(4, 4, 8);
-  renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer = new THREE.WebGLRenderer({antialias:false, alpha:false, powerPreference:'low-power'});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   viewport.appendChild(renderer.domElement);
   controls = new OrbitControls(camera, renderer.domElement);
@@ -373,9 +373,26 @@ function initViewer() {
   if ('ResizeObserver' in window) new ResizeObserver(resize).observe(viewport);
   else window.addEventListener('resize', resize);
   resize();
-  renderer.setAnimationLoop(() => {
+  let lastFrame = 0;
+  renderer.setAnimationLoop((time) => {
+    if (document.hidden) return;
+    if (time - lastFrame < 33) return;
+    lastFrame = time;
     controls.update();
     renderer.render(scene, camera);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!renderer) return;
+    if (document.hidden) renderer.setAnimationLoop(null);
+    else {
+      lastFrame = 0;
+      renderer.setAnimationLoop((time) => {
+        if (document.hidden || time - lastFrame < 33) return;
+        lastFrame = time;
+        controls.update();
+        renderer.render(scene, camera);
+      });
+    }
   });
 }
 function disposeModel() {
@@ -716,14 +733,15 @@ function autoMapBones(){
    const score=boneScore(boneList[i],slot,aliases);
    if(score>bestScore){bestScore=score;bestIndex=i;}
   }
-  if(bestIndex>=0&&bestScore>=65){
+  const threshold=slotFingerInfo(slot)?78:65;
+  if(bestIndex>=0&&bestScore>=threshold){
    humanoidMapping[slot]=String(bestIndex);
    used.add(bestIndex);
   }
  }
  populateBoneTools();
  const missing=requiredHumanoidBones.filter(name=>humanoidMapping[name]===undefined);
- $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'Still required: '+missing.join(', ')+'.':'All required bones detected.')+' Please inspect the assignments; ambiguous/custom rig names may need manual mapping.';
+ $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'Still required: '+missing.join(', ')+'.':'All required bones detected.')+' Review assignments before export.';
 }
 function populateMaterials(){
  materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,originalMaterial:m,slot:i,isArray:Array.isArray(o.material),label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
@@ -833,7 +851,7 @@ function getExportMeta() {
   if (!name || !author) throw new Error('Please enter both Model name and Author in the VRM metadata section.');
   return {name,author,version:value('metaVersion')||'1.0',contact:value('metaContact'),reference:value('metaReference'),allowed:value('metaLicense'),violent:value('metaPermission'),sexual:value('metaSexual'),commercial:value('metaCommercial'),license:value('metaLicenseName')||value('metaRedistribution'),other:value('metaOther')};
 }
-const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+const requiredHumanoidBones = ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
 function getHumanoidObjects(version) {
   const mapped = {};
   for (const [slot, indexText] of Object.entries(humanoidMapping)) {
@@ -897,11 +915,27 @@ async function exportVRM(version) {
     const blob = result.blob;
     if (!(blob instanceof Blob) || blob.size < 20) throw new Error('VRM-exporter returned an empty file.');
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (meta.name || 'Aster_Model').replace(/[^a-z0-9_-]/gi, '_') + '_VRM' + (version === '0' ? '0' : '1') + '.vrm';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const filename = (meta.name || 'Aster_Model').replace(/[^a-z0-9_-]/gi, '_') + '_VRM' + (version === '0' ? '0' : '1') + '.vrm';
+    let downloadLink = $('downloadFallback');
+    if (!downloadLink) {
+      downloadLink = document.createElement('a');
+      downloadLink.id = 'downloadFallback';
+      downloadLink.className = 'status good';
+      downloadLink.style.display = 'block';
+      downloadLink.style.marginTop = '10px';
+      $('exportStatus').after(downloadLink);
+    }
+    if (window.asterDownloadUrl) URL.revokeObjectURL(window.asterDownloadUrl);
+    window.asterDownloadUrl = url;
+    downloadLink.href = url;
+    downloadLink.download = filename;
+    downloadLink.textContent = 'Tap here if download did not start: ' + filename;
+    downloadLink.setAttribute('role','button');
+    downloadLink.style.textDecoration = 'none';
+    downloadLink.style.padding = '12px';
+    downloadLink.style.cursor = 'pointer';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
     const report = result.report || {};
     const extra = version === '0' ? ' · secondary root included · spring groups ' + (report.springBoneGroups || 0) + ' · colliders ' + (report.colliderGroups || 0) : '';
     $('exportStatus').textContent = 'VRM ' + (version === '0' ? '0.x' : '1.0') + ' exported · ' +
