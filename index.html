@@ -854,14 +854,31 @@ const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerAr
 const requiredVrm0HumanoidBones = ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
 function getHumanoidObjects(version) {
   const mapped = {};
-  for (const [slot, indexText] of Object.entries(humanoidMapping)) {
+  // Read the live controls at export time as well as the state object.
+  // This prevents a valid visible selection from being lost when the
+  // mapping controls have been rebuilt after FBX import.
+  const liveSelections = new Map(
+    Array.from($('boneMappingGrid').querySelectorAll('select[data-slot]'))
+      .map(select => [select.dataset.slot, select.value])
+  );
+  for (const [slot] of humanoidSlots) {
+    const liveValue = liveSelections.get(slot);
+    const indexText = liveValue !== undefined ? liveValue : humanoidMapping[slot];
     if (indexText === '' || indexText == null) continue;
-    const bone = boneList[Number(indexText)];
-    if (bone) mapped[slot] = bone;
+    const index = Number(indexText);
+    if (!Number.isInteger(index) || index < 0 || index >= boneList.length) continue;
+    const bone = boneList[index];
+    if (bone && bone.isBone) mapped[slot] = bone;
   }
   const required = version === '0' ? ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'] : requiredHumanoidBones;
   const missing = required.filter(name => !mapped[name]);
-  if (missing.length) throw new Error('Required VRM ' + (version === '0' ? '0.x' : '1.0') + ' humanoid bones are missing: ' + missing.join(', ') + '. Complete mapping first.');
+  if (missing.length) {
+    const hipsSelect = liveSelections.get('hips');
+    const hipsDetail = missing.includes('hips')
+      ? (hipsSelect ? ' The selected Hips entry no longer points to a detected bone; please reselect Hips from the list.' : ' Select a bone in the Hips field before exporting.')
+      : '';
+    throw new Error('Required VRM ' + (version === '0' ? '0.x' : '1.0') + ' humanoid bones are missing: ' + missing.join(', ') + '. ' + 'Detected bones: ' + boneList.length + '.' + hipsDetail);
+  }
   const assigned = Object.values(mapped);
   if (new Set(assigned).size !== assigned.length) throw new Error('One bone is assigned to multiple humanoid slots. Correct the mapping.');
   return mapped;
