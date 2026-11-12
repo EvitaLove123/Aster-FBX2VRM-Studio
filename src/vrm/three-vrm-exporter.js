@@ -191,6 +191,30 @@ function writeGlb(json, chunks) {
   return output;
 }
 
+
+// FBX files may contain repeated bone names (for example several objects named
+// "Hips"). glTF/VRM humanoid references require each mapped node name to be unique.
+// Keep the first name and give later duplicates deterministic, collision-safe names.
+function ensureUniqueObjectNames(scene) {
+  const counts = new Map();
+  const used = new Set();
+  scene.traverse(object => {
+    if (!object.name) return;
+    const original = object.name;
+    const count = (counts.get(original) || 0) + 1;
+    counts.set(original, count);
+    if (count === 1 && !used.has(original)) {
+      used.add(original);
+      return;
+    }
+    let suffix = count;
+    let candidate;
+    do { candidate = original + '__aster_' + suffix++; } while (used.has(candidate));
+    object.name = candidate;
+    used.add(candidate);
+  });
+}
+
 function resolveHumanoidNodes(scene, gltfJson, mapping) {
   if (!mapping || typeof mapping !== 'object') throw new Error('Humanoid mapping is required.');
 
@@ -269,6 +293,7 @@ export async function exportVrm10(scene, options = {}) {
     throw new TypeError('A Three.js avatar scene is required.');
   }
   const meta = makeMeta(options.meta || {});
+  ensureUniqueObjectNames(scene);
   scene.updateMatrixWorld(true);
 
   const exporter = new GLTFExporter();
