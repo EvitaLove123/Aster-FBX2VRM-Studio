@@ -492,26 +492,25 @@ async function loadFbxBuffer(buffer, fileName) {
   $('materialCount').textContent = '—';
   $('boneCount').textContent = '—';
   $('details').textContent = 'Reading FBX data locally…';
-  status('Parsing FBX…');
+  status('Parsing FBX… Large models may take a while on mobile. Keep this tab open.');
   try {
     initViewer();
     disposeModel();
     const loader = new FBXLoader(createTextureManager());
     const model = loader.parse(buffer.slice(0), '');
     if (!model || !model.isObject3D) throw new Error('FBXLoader did not return a valid 3D object.');
+    // Keep Three.js frustum culling enabled: forcing every mesh to render
+    // makes large FBX previews unnecessarily expensive on mobile GPUs.
+    // Avoid eager normal/bounds generation here; the renderer and export
+    // pipeline can calculate what they need lazily.
     model.traverse(obj => {
       obj.visible = true;
       if (!obj.isMesh) return;
-      obj.frustumCulled = false;
-      if (obj.geometry) {
-        if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) obj.geometry.computeVertexNormals();
-        if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
-      }
+      obj.frustumCulled = true;
       const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
       for (const mat of mats) {
-        mat.side = THREE.DoubleSide;
+        // Preserve the FBX material's sidedness instead of forcing DoubleSide.
         mat.visible = true;
-        mat.needsUpdate = true;
       }
     });
     model.updateMatrixWorld(true);
