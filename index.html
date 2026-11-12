@@ -722,8 +722,8 @@ function autoMapBones(){
  humanoidMapping={};
  const used=new Set();
  const ordered=humanoidSlots.slice().sort((a,b)=>{
-  const ar=requiredHumanoidBones.includes(a[0])?0:1;
-  const br=requiredHumanoidBones.includes(b[0])?0:1;
+  const ar=requiredVrm0HumanoidBones.includes(a[0])?0:1;
+  const br=requiredVrm0HumanoidBones.includes(b[0])?0:1;
   return ar-br;
  });
  for(const [slot,aliases] of ordered){
@@ -740,8 +740,8 @@ function autoMapBones(){
   }
  }
  populateBoneTools();
- const missing=requiredHumanoidBones.filter(name=>humanoidMapping[name]===undefined);
- $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'Still required: '+missing.join(', ')+'.':'All required bones detected.')+' Review assignments before export.';
+ const missing=requiredVrm0HumanoidBones.filter(name=>humanoidMapping[name]===undefined);
+ $('mappingStatus').textContent='Auto Mapping complete: '+Object.keys(humanoidMapping).length+' / '+humanoidSlots.length+' slots. '+(missing.length?'VRM 0.x still needs: '+missing.join(', ')+'.':'VRM 0.x required bones detected.')+' Review assignments before export.';
 }
 function populateMaterials(){
  materialList=[]; if(currentModel) currentModel.traverse(o=>{if(o.isMesh&&o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach((m,i)=>materialList.push({mesh:o,material:m,originalMaterial:m,slot:i,isArray:Array.isArray(o.material),label:(o.name||'Mesh')+' / '+(m.name||'Material '+(i+1))}));}});
@@ -851,7 +851,8 @@ function getExportMeta() {
   if (!name || !author) throw new Error('Please enter both Model name and Author in the VRM metadata section.');
   return {name,author,version:value('metaVersion')||'1.0',contact:value('metaContact'),reference:value('metaReference'),allowed:value('metaLicense'),violent:value('metaPermission'),sexual:value('metaSexual'),commercial:value('metaCommercial'),license:value('metaLicenseName')||value('metaRedistribution'),other:value('metaOther')};
 }
-const requiredHumanoidBones = ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+const requiredHumanoidBones = ['hips','spine','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
+const requiredVrm0HumanoidBones = ['hips','spine','chest','neck','head','leftUpperArm','leftLowerArm','leftHand','rightUpperArm','rightLowerArm','rightHand','leftUpperLeg','leftLowerLeg','leftFoot','rightUpperLeg','rightLowerLeg','rightFoot'];
 function getHumanoidObjects(version) {
   const mapped = {};
   for (const [slot, indexText] of Object.entries(humanoidMapping)) {
