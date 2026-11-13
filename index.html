@@ -86,6 +86,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <div id="viewport"><div class="empty" id="empty">Your FBX model preview will appear here.<br>Choose an FBX file to begin.</div></div>
 <div class="toolbar">
 <button id="resetCamera" class="secondary" type="button" disabled>Reset camera</button>
+<button id="rotateModel180" class="secondary" type="button" disabled>Rotate model 180° (Y)</button>
 <button id="autoTPose" type="button" disabled>Auto T-pose</button>
 <button id="resetPose" class="secondary" type="button" disabled>Reset pose</button>
 <button id="showAxes" class="secondary" type="button">Toggle axes</button>
@@ -202,6 +203,7 @@ let initialPose = new Map();
 let boneList = [];
 let materialList = [];
 let humanoidMapping = {};
+let modelRotated180 = false;
 
 
 function setupAsterWizard() {
@@ -471,11 +473,24 @@ $('showAxes').addEventListener('click', () => {
 $('resetCamera').addEventListener('click', () => {
   if (currentModel) frameObject(currentModel);
 });
+$('rotateModel180').addEventListener('click', () => {
+  if (!currentModel) return;
+  currentModel.rotateY(modelRotated180 ? -Math.PI : Math.PI);
+  modelRotated180 = !modelRotated180;
+  $('rotateModel180').textContent = modelRotated180 ? 'Restore original direction' : 'Rotate model 180° (Y)';
+  frameObject(currentModel);
+  $('exportStatus').textContent = modelRotated180
+    ? 'Model rotated 180° around the Y axis. This orientation will be included in VRM export.'
+    : 'Original model direction restored. This orientation will be included in VRM export.';
+});
 async function loadFbxBuffer(buffer, fileName) {
   $('empty').style.display = 'grid';
   $('exportVRM0').disabled = true;
   $('exportVRM1').disabled = true;
   $('resetCamera').disabled = true;
+  $('rotateModel180').disabled = true;
+  $('rotateModel180').textContent = 'Rotate model 180° (Y)';
+  modelRotated180 = false;
   $('autoTPose').disabled = true;
   $('resetPose').disabled = true;
   humanoidMapping = {};
@@ -540,6 +555,7 @@ async function loadFbxBuffer(buffer, fileName) {
     $('exportVRM1').disabled = false;
     $('empty').style.display = 'none';
     $('resetCamera').disabled = false;
+    $('rotateModel180').disabled = false;
     $('autoTPose').disabled = bones === 0;
     $('resetPose').disabled = bones === 0;
     status('FBX preview ready', 'good');
