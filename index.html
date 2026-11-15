@@ -91,6 +91,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <button id="resetPose" class="secondary" type="button" disabled>Reset pose</button>
 <button id="showAxes" class="secondary" type="button">Toggle axes</button>
 </div>
+<p class="note" id="orientationStatus">Automatic upright detection will run after FBX import using the Head-to-Hips direction. If those bones cannot be identified, no automatic rotation is applied.</p>
 <p class="note">Touch: drag to orbit · pinch to zoom · two-finger drag to pan. On desktop: left-drag orbit · wheel zoom · right-drag pan.</p>
 </section>
 <section class="card">
@@ -440,6 +441,35 @@ function frameObject(object) {
   controls.maxDistance = maxDim * 30;
   controls.update();
 }
+// Detect the avatar's vertical direction from its semantic skeleton, then
+// rotate the FBX root as one unit. This preserves mesh skinning and bone-local poses.
+function autoUprightModel(model) {
+  const hips = findBoneByAliases(model, ['Hips','Pelvis','Bip001Pelvis','RootPelvis']);
+  const head = findBoneByAliases(model, ['Head','Bip001Head','mixamorigHead']);
+  if (!hips || !head) {
+    return { corrected: false, reason: 'Could not identify both Hips/Pelvis and Head bones; automatic upright correction was skipped.' };
+  }
+  model.updateMatrixWorld(true);
+  const hipsPosition = hips.getWorldPosition(new THREE.Vector3());
+  const headPosition = head.getWorldPosition(new THREE.Vector3());
+  const upDirection = headPosition.sub(hipsPosition);
+  if (!Number.isFinite(upDirection.lengthSq()) || upDirection.lengthSq() < 1e-8) {
+    return { corrected: false, reason: 'Head and Hips positions are too close; automatic upright correction was skipped.' };
+  }
+  upDirection.normalize();
+  const targetUp = new THREE.Vector3(0, 1, 0);
+  const angle = upDirection.angleTo(targetUp);
+  if (angle < THREE.MathUtils.degToRad(3)) {
+    return { corrected: false, reason: 'Model is already upright.' };
+  }
+  const correction = new THREE.Quaternion().setFromUnitVectors(upDirection, targetUp);
+  // FBXLoader returns the avatar as a root Object3D under the scene.
+  // Premultiplication applies the correction in scene/world space.
+  model.quaternion.premultiply(correction).normalize();
+  model.updateMatrixWorld(true);
+  return { corrected: true, angleDegrees: THREE.MathUtils.radToDeg(angle) };
+}
+
 function createTextureManager() {
   const manager = new THREE.LoadingManager();
   manager.setURLModifier(url => {
@@ -529,9 +559,13 @@ async function loadFbxBuffer(buffer, fileName) {
       }
     });
     model.updateMatrixWorld(true);
+    const uprightResult = autoUprightModel(model);
     currentModel = model;
     scene.add(currentModel);
     frameObject(currentModel);
+    $('orientationStatus').textContent = uprightResult.corrected
+      ? 'Auto upright correction applied (' + uprightResult.angleDegrees.toFixed(1) + '°). The FBX root was corrected as one unit; mesh and bone-local transforms were preserved.'
+      : uprightResult.reason;
     let meshes = 0, renderable = 0, materials = 0, bones = 0, skinnedMeshes = 0;
     model.traverse(obj => {
       if (obj.isMesh) {
