@@ -91,7 +91,7 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <button id="resetPose" class="secondary" type="button" disabled>Reset pose</button>
 <button id="showAxes" class="secondary" type="button">Toggle axes</button>
 </div>
-<p class="note" id="orientationStatus">Automatic upright detection will run after FBX import using the Head-to-Hips direction. If those bones cannot be identified, no automatic rotation is applied.</p>
+<p class="note" id="orientationStatus">Automatic orientation correction is currently disabled to preserve FBX skinning and morph targets. Use the source orientation until a safe axis conversion is validated.</p>
 <p class="note">Touch: drag to orbit · pinch to zoom · two-finger drag to pan. On desktop: left-drag orbit · wheel zoom · right-drag pan.</p>
 </section>
 <section class="card">
@@ -559,13 +559,12 @@ async function loadFbxBuffer(buffer, fileName) {
       }
     });
     model.updateMatrixWorld(true);
-    const uprightResult = autoUprightModel(model);
+    // Do not rotate the FBX root automatically: root-space rotation can be
+    // incompatible with some FBX bind poses and morph-target export pipelines.
+    // Keep original transforms until a validated axis-conversion path is available.
     currentModel = model;
     scene.add(currentModel);
     frameObject(currentModel);
-    $('orientationStatus').textContent = uprightResult.corrected
-      ? 'Auto upright correction applied (' + uprightResult.angleDegrees.toFixed(1) + '°). The FBX root was corrected as one unit; mesh and bone-local transforms were preserved.'
-      : uprightResult.reason;
     let meshes = 0, renderable = 0, materials = 0, bones = 0, skinnedMeshes = 0;
     model.traverse(obj => {
       if (obj.isMesh) {
