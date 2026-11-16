@@ -542,7 +542,10 @@ async function loadFbxBuffer(buffer, fileName) {
     initViewer();
     disposeModel();
     const loader = new FBXLoader(createTextureManager());
-    const model = loader.parse(buffer.slice(0), '');
+    // FBXLoader reads the ArrayBuffer without modifying it. Reuse the original
+     // buffer instead of cloning it: the extra full-size copy can spike memory
+     // on Android during large FBX imports and texture reloads.
+     const model = loader.parse(buffer, '');
     if (!model || !model.isObject3D) throw new Error('FBXLoader did not return a valid 3D object.');
     // Keep Three.js frustum culling enabled: forcing every mesh to render
     // makes large FBX previews unnecessarily expensive on mobile GPUs.
@@ -581,7 +584,7 @@ async function loadFbxBuffer(buffer, fileName) {
     $('meshCount').textContent = meshes + ' (' + renderable + ' renderable)';
     $('materialCount').textContent = String(materials);
     $('boneCount').textContent = String(bones);
-    $('details').textContent = 'FBX parsed. ' + skinnedMeshes + ' skinned mesh(es) detected. Mesh frustum culling is disabled for preview; materials are double-sided. Source geometry and skin weights are not edited.';
+    $('details').textContent = 'FBX parsed. ' + skinnedMeshes + ' skinned mesh(es) detected. Mesh frustum culling is enabled for preview; original material sidedness is preserved. Source geometry and skin weights are not edited.';
     populateBoneTools();
     populateMaterials();
     $('exportVRM0').disabled = false;
