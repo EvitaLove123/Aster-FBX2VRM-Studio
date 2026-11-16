@@ -1,1 +1,63 @@
 # Aster-FBX2VRM-Studio
+
+Android-first, browser-hosted FBX-to-VRM workbench. The production target is a local-processing Hybrid pipeline that exports both VRM 0.x and VRM 1.0.
+
+## Current implementation (do not confuse with the target architecture)
+
+The GitHub Pages frontend currently uses:
+
+- Three.js 0.164.1 and `FBXLoader` for local FBX parsing and preview.
+- Three.js `GLTFExporter` and the project modules in `src/vrm/` for the current experimental VRM serialization path.
+- `@pixiv/three-vrm` 2.1.3 for read-back inspection of the generated VRM/GLB.
+
+**The current exporter is not UniVRM.** The VRM extensions are assembled by the JavaScript serializers in `src/vrm/three-vrm0-exporter.js` and `src/vrm/three-vrm-exporter.js`; three-vrm is used to load and inspect the result. Do not describe this as a genuine UniVRM export or claim target-app compatibility without separate validation.
+
+## Agreed target architecture: Hybrid
+
+1. **Browser frontend (GitHub Pages):** HTML/CSS/JavaScript and Three.js handle FBX import, external textures, preview, bone mapping, pose editing and preprocessing.
+2. **Intermediate GLB:** serialize the prepared avatar to a binary glTF (GLB), preserving mesh geometry, skinning, skeleton hierarchy, textures and morph targets.
+3. **Unity WebGL export module:** load that GLB with UniGLTF and use the genuine UniVRM runtime export APIs to produce the selected format.
+4. **Return to browser:** transfer the resulting VRM bytes and structured validation report back to the frontend; create a local download. No model upload/backend is required by default.
+
+The Unity WebGL module is a planned component and is **not present in this repository yet**. The current JavaScript serializers remain experimental until the Unity module is integrated and the two export paths are compared.
+
+## Current browser features
+
+- Local FBX selection and Three.js preview.
+- Optional external texture matching by filename.
+- Mesh/material/skeleton inspection.
+- Humanoid and finger mapping UI.
+- Experimental Auto T-pose and manual 180-degree model rotation.
+- Material preview controls and VRM metadata inputs.
+- Experimental VRM 0.x and VRM 1.0 JavaScript export paths with three-vrm read-back inspection.
+
+## Not yet implemented in the target Hybrid pipeline
+
+- FBX-to-GLB handoff contract for the Unity WebGL module.
+- Unity project and reproducible WebGL build using pinned Unity, UniGLTF and UniVRM versions.
+- Runtime GLB import and VRM 0.x / VRM 1.0 export through UniVRM.
+- Transfer of VRM bytes, progress, cancellation and structured validation results between Unity WebGL and the browser.
+- End-to-end validation of mesh, textures, skin weights, skeleton, morph targets, expressions, spring bones and colliders in target apps.
+
+## Android and memory-safety rules
+
+- Keep model processing local in the browser.
+- Avoid unnecessary full-size copies of FBX, GLB and VRM ArrayBuffers.
+- Release replaced model geometry, materials, textures and object URLs.
+- Keep preview GPU cost low and expose clear progress/errors.
+- Do not impose an arbitrary file-size limit without device testing; warn and fail cleanly when memory is insufficient.
+
+## Next milestone
+
+Create a minimal Unity WebGL export module and prove the smallest round trip first:
+
+`FBX → Three.js scene → GLB → UniGLTF import → UniVRM export → VRM bytes → browser download`
+
+Test with a small humanoid that has one skinned mesh, one texture and at least one morph target before adding large-model optimizations. Keep VRM 0.x and VRM 1.0 as explicit export choices and validate each independently.
+
+## References
+
+- [UniVRM repository](https://github.com/vrm-c/UniVRM)
+- [UniVRM documentation](https://vrm.dev/en/)
+- [Three.js documentation](https://threejs.org/docs/)
+- [three-vrm repository](https://github.com/pixiv/three-vrm)
