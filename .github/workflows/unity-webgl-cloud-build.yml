@@ -1,0 +1,66 @@
+name: Unity WebGL Cloud Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - automation/unity-webgl-cloud-build
+    paths:
+      - "unity/AsterVrmExporter/**"
+      - ".github/workflows/unity-webgl-cloud-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aster-unity-webgl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build UniVRM WebGL module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Check Unity license secret
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        shell: bash
+        run: |
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "::error title=Unity license missing::Add a Unity Personal or Professional license file as the repository secret UNITY_LICENSE before running this workflow."
+            exit 1
+          fi
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: unity/AsterVrmExporter/Library
+          key: UnityLibrary-WebGL-2022.3.62f1-${{ hashFiles('unity/AsterVrmExporter/Assets/**', 'unity/AsterVrmExporter/Packages/**', 'unity/AsterVrmExporter/ProjectSettings/**') }}
+          restore-keys: |
+            UnityLibrary-WebGL-2022.3.62f1-
+
+      - name: Build WebGL with GameCI
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: unity/AsterVrmExporter
+          unityVersion: 2022.3.62f1
+          targetPlatform: WebGL
+          buildsPath: build
+          buildMethod: AsterVrmExporter.Editor.AsterCloudBuild.BuildWebGL
+          manualExit: true
+
+      - name: Upload WebGL build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aster-unity-webgl
+          path: build/WebGL
+          if-no-files-found: error
+          retention-days: 7
