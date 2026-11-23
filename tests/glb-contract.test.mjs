@@ -78,7 +78,7 @@ test('rejects a missing skin when the source has skinned meshes', () => {
 test('rejects lost morph targets', () => {
   const json = makeJson();
   delete json.meshes[0].primitives[0].targets;
-  assert.throws(() => inspectGlbContract(makeGlb(json), source), /no morph targets/);
+  assert.throws(() => inspectGlbContract(makeGlb(json), source), /none were written to the GLB/);
 });
 
 test('rejects missing image data when source materials use textures', () => {
