@@ -160,6 +160,16 @@ export function inspectGlbContract(input, source = {}) {
   }
 
   const warnings = [];
+  for (const [index, node] of nodes.entries()) {
+    if (node.mesh !== undefined &&
+        (!Number.isInteger(node.mesh) || node.mesh < 0 || node.mesh >= meshes.length)) {
+      throw new Error('glTF node ' + index + ' references an invalid mesh index.');
+    }
+    if (node.skin !== undefined &&
+        (!Number.isInteger(node.skin) || node.skin < 0 || node.skin >= skins.length)) {
+      throw new Error('glTF node ' + index + ' references an invalid skin index.');
+    }
+  }
   const skinnedNodeCount = nodes.filter((node) => Number.isInteger(node.skin)).length;
   if ((source.skinnedMeshCount || 0) > 0 && skins.length === 0) {
     throw new Error('The source contains skinned meshes, but the GLB contains no glTF skins.');
@@ -179,6 +189,9 @@ export function inspectGlbContract(input, source = {}) {
   }
   if ((source.morphTargetMeshCount || 0) > 0 && morphTargetCount === 0) {
     throw new Error('The source contains morph targets, but none were written to the GLB.');
+  }
+  if ((source.sourceMorphTargetCount || 0) > morphTargetCount) {
+    throw new Error('The GLB contains fewer morph targets than the source avatar.');
   }
   if ((source.textureCount || 0) > 0 && images.length === 0) {
     throw new Error('The source contains textures, but the GLB contains no images.');
