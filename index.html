@@ -160,6 +160,12 @@ select,textarea{font:inherit;width:100%;min-height:42px;border:1px solid var(--l
 <button id="exportVRM0" type="button" disabled>Download VRM 0.x</button>
 <button id="exportVRM1" type="button" disabled>Download VRM 1.0</button>
 </div>
+<div class="formfield" style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f8faff">
+<strong>Hybrid GLB handoff</strong>
+<p class="note">Prepare a binary GLB intermediate for the planned Unity WebGL + UniGLTF module. This downloads GLB only; it is not a UniVRM export.</p>
+<button id="prepareGlb" class="secondary" type="button" disabled>Prepare GLB for Unity WebGL</button>
+<div id="handoffStatus" class="sectionhint">Load an FBX model to prepare the intermediate GLB.</div>
+</div>
 <div class="formfield" style="margin-top:12px"><label for="exportTextureSize">Texture size limit for faster loading</label><select id="exportTextureSize"><option value="1024">1024 px · Smallest file</option><option value="2048" selected>2048 px · Recommended</option><option value="4096">4096 px · Highest detail</option></select><p class="sectionhint">Large source textures are resized during export. This can reduce VRM size and app loading time, but may reduce texture detail.</p></div>
 <div id="exportStatus" class="sectionhint">Load a model and complete required humanoid mapping to export.</div>
 </section>
@@ -188,6 +194,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { exportVrm0 } from './src/vrm/three-vrm0-exporter.js';
 import { exportVrm10 } from './src/vrm/three-vrm-exporter.js';
+import { exportPreparedAvatarGlb } from './src/hybrid/glb-handoff.mjs';
 
 const $ = id => document.getElementById(id);
 const viewport = $('viewport');
@@ -514,9 +521,17 @@ $('rotateModel180').addEventListener('click', () => {
     : 'Original model direction restored. This orientation will be included in VRM export.';
 });
 async function loadFbxBuffer(buffer, fileName) {
+  if (window.asterGlbDownloadUrl) {
+    URL.revokeObjectURL(window.asterGlbDownloadUrl);
+    window.asterGlbDownloadUrl = null;
+  }
+  const previousGlbLink = $('glbDownloadFallback');
+  if (previousGlbLink) previousGlbLink.remove();
   $('empty').style.display = 'grid';
   $('exportVRM0').disabled = true;
   $('exportVRM1').disabled = true;
+  $('prepareGlb').disabled = true;
+  $('handoffStatus').textContent = 'Waiting for a valid FBX model.';
   $('resetCamera').disabled = true;
   $('rotateModel180').disabled = true;
   $('rotateModel180').textContent = 'Rotate model 180° (Y)';
@@ -589,6 +604,8 @@ async function loadFbxBuffer(buffer, fileName) {
     populateMaterials();
     $('exportVRM0').disabled = false;
     $('exportVRM1').disabled = false;
+    $('prepareGlb').disabled = false;
+    $('handoffStatus').textContent = 'FBX loaded. Prepare a GLB to inspect the Unity handoff contract.';
     $('empty').style.display = 'none';
     $('resetCamera').disabled = false;
     $('rotateModel180').disabled = false;
@@ -601,6 +618,8 @@ async function loadFbxBuffer(buffer, fileName) {
     disposeModel();
     $('exportVRM0').disabled = true;
     $('exportVRM1').disabled = true;
+  $('prepareGlb').disabled = true;
+  $('handoffStatus').textContent = 'Waiting for a valid FBX model.';
     $('resetCamera').disabled = true;
     $('autoTPose').disabled = true;
     $('resetPose').disabled = true;
@@ -608,6 +627,7 @@ async function loadFbxBuffer(buffer, fileName) {
     $('materialCount').textContent = '—';
     $('boneCount').textContent = '—';
     $('details').textContent = 'Could not parse this FBX: ' + message;
+    $('handoffStatus').textContent = 'GLB handoff unavailable because FBX loading failed.';
     $('mappingStatus').textContent = 'FBX loading failed. Select another FBX or try again.';
     $('empty').style.display = 'grid';
     status('FBX load failed: ' + message.slice(0, 110), 'bad');
@@ -1096,6 +1116,64 @@ async function exportVRM(version) {
     button.textContent = label;
   }
 }
+async function prepareGlbHandoff() {
+  const button = $('prepareGlb');
+  const label = button.textContent;
+  let restoreTextureImages = null;
+  try {
+    if (!currentModel) throw new Error('Load an FBX model first.');
+    button.disabled = true;
+    button.textContent = 'Preparing GLB…';
+    $('handoffStatus').textContent = 'Serializing mesh, skinning, textures and morph targets locally…';
+    restoreTextureImages = await prepareExportTextures(currentModel);
+    const result = await exportPreparedAvatarGlb(currentModel, {
+      maxTextureSize: Number($('exportTextureSize').value) || 2048
+    });
+    if (restoreTextureImages) { restoreTextureImages(); restoreTextureImages = null; }
+
+    if (window.asterGlbDownloadUrl) URL.revokeObjectURL(window.asterGlbDownloadUrl);
+    const url = URL.createObjectURL(result.blob);
+    window.asterGlbDownloadUrl = url;
+    const baseName = ($('metaName').value.trim() || lastFbxName.replace(/\.fbx$/i, '') || 'Aster_Avatar')
+      .replace(/[^a-z0-9_-]/gi, '_');
+    const filename = baseName + '_Unity_Handoff.glb';
+    let link = $('glbDownloadFallback');
+    if (!link) {
+      link = document.createElement('a');
+      link.id = 'glbDownloadFallback';
+      link.className = 'status good';
+      link.style.display = 'block';
+      link.style.marginTop = '10px';
+      $('handoffStatus').after(link);
+    }
+    link.href = url;
+    link.download = filename;
+    link.textContent = 'Tap here if download did not start: ' + filename;
+    link.style.textDecoration = 'none';
+    link.style.padding = '12px';
+    link.style.cursor = 'pointer';
+    link.click();
+
+    const report = result.report;
+    const warningText = report.warnings.length
+      ? ' Warnings: ' + report.warnings.join(' ')
+      : ' Structural handoff checks passed.';
+    $('handoffStatus').textContent =
+      'GLB prepared · ' + (result.blob.size / 1048576).toFixed(2) + ' MB · ' +
+      report.meshCount + ' meshes · ' + report.skinCount + ' skins · ' +
+      report.morphTargetCount + ' morph targets · ' + report.embeddedImageCount +
+      ' embedded images.' + warningText +
+      ' Unity/UniVRM import is not yet connected.';
+  } catch (error) {
+    console.error('Aster GLB handoff error:', error);
+    $('handoffStatus').textContent = 'GLB preparation failed: ' + (error.message || String(error));
+  } finally {
+    if (restoreTextureImages) restoreTextureImages();
+    button.disabled = !currentModel;
+    button.textContent = label;
+  }
+}
+$('prepareGlb').addEventListener('click', prepareGlbHandoff);
 $('exportVRM0').addEventListener('click',()=>exportVRM('0'));
 $('exportVRM1').addEventListener('click',()=>exportVRM('1'));
 
