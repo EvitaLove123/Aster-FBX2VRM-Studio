@@ -63,6 +63,7 @@ test('reports meshes, skin joints, embedded images and morph targets', () => {
   const report = inspectGlbContract(makeGlb(makeJson()), source);
   assert.equal(report.meshCount, 1);
   assert.equal(report.skinCount, 1);
+  assert.equal(report.skinnedNodeCount, 1);
   assert.equal(report.skinJointCount, 2);
   assert.equal(report.embeddedImageCount, 1);
   assert.equal(report.morphTargetCount, 2);
@@ -126,4 +127,10 @@ test('summarizes skinned meshes, morph targets and supported texture slots', () 
     materialCount: 1,
     textureCount: 1
   });
+});
+
+test('rejects skin data that is not attached to a mesh node', () => {
+  const json = makeJson();
+  delete json.nodes[0].skin;
+  assert.throws(() => inspectGlbContract(makeGlb(json), source), /no mesh node references a skin/);
 });
