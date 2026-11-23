@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectGlbContract, parseGlbContainer } from '../src/hybrid/glb-contract.mjs';
+import { inspectGlbContract, parseGlbContainer, summarizeThreeScene } from '../src/hybrid/glb-contract.mjs';
 
 function makeGlb(json, binary = new Uint8Array([0, 0, 0, 0])) {
   const jsonBytes = new TextEncoder().encode(JSON.stringify(json));
@@ -103,4 +103,27 @@ test('rejects a GLB whose declared length does not match the buffer', () => {
   const buffer = makeGlb(makeJson());
   new DataView(buffer).setUint32(8, buffer.byteLength - 4, true);
   assert.throws(() => parseGlbContainer(buffer), /declared length/);
+});
+
+test('summarizes skinned meshes, morph targets and supported texture slots', () => {
+  const supportedTexture = { isTexture: true };
+  const unsupportedTexture = { isTexture: true };
+  const root = {
+    traverse(callback) {
+      callback({
+        isMesh: true,
+        isSkinnedMesh: true,
+        geometry: { morphAttributes: { position: [{}, {}] } },
+        material: { map: supportedTexture, bumpMap: unsupportedTexture }
+      });
+    }
+  };
+  assert.deepEqual(summarizeThreeScene(root), {
+    meshCount: 1,
+    skinnedMeshCount: 1,
+    morphTargetMeshCount: 1,
+    sourceMorphTargetCount: 2,
+    materialCount: 1,
+    textureCount: 1
+  });
 });
