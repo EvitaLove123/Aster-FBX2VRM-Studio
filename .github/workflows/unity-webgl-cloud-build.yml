@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - automation/unity-webgl-cloud-build
     paths:
       - "unity/AsterVrmExporter/**"
       - ".github/workflows/unity-webgl-cloud-build.yml"
@@ -27,13 +26,22 @@ jobs:
         with:
           lfs: true
 
-      - name: Check Unity license secret
+      - name: Check Unity license secrets
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         shell: bash
         run: |
-          if [ -z "$UNITY_LICENSE" ]; then
-            echo "::error title=Unity license missing::Add a Unity Personal or Professional license file as the repository secret UNITY_LICENSE before running this workflow."
+          missing=0
+          for name in UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Missing GitHub secret::$name is required for the configured GameCI Personal-license flow."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "See unity/README.md for the Android-accessible activation workflow and secret setup."
             exit 1
           fi
 
@@ -49,6 +57,8 @@ jobs:
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: unity/AsterVrmExporter
           unityVersion: 2022.3.62f1
