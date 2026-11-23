@@ -93,3 +93,17 @@ Test with a small humanoid that has one skinned mesh, one texture and at least o
 - [UniVRM documentation](https://vrm.dev/en/)
 - [Three.js documentation](https://threejs.org/docs/)
 - [three-vrm repository](https://github.com/pixiv/three-vrm)
+
+
+## Unity WebGL cloud-build scaffold (implemented; exporter not complete)
+
+- Unity project foundation is under `unity/AsterVrmExporter/`.
+- Editor version is pinned to Unity 2022.3.62f1.
+- Official UniVRM v0.131.4 UPM Git dependencies are pinned for UniGLTF, VRM 0.x and VRM 1.0.
+- `.github/workflows/unity-webgl-cloud-build.yml` uses GameCI to build a WebGL artifact after Unity license secrets are configured.
+- `.github/workflows/unity-license-request.yml` can generate the Unity manual activation request artifact from GitHub Actions, so the request file can be retrieved on Android.
+- The current Editor build entry point creates a minimal scene for validating the cloud build toolchain.
+
+This is **cloud-build infrastructure only**. The Unity runtime GLB importer, UniVRM runtime exporters, JavaScript bridge and GitHub Pages deployment of the Unity module are still not implemented. A successful placeholder WebGL build must not be described as a working FBX-to-VRM converter.
+
+See [unity/README.md](unity/README.md) for license prerequisites and the Android-first setup steps.
