@@ -72,6 +72,7 @@ test('reports meshes, skin joints, embedded images and morph targets', () => {
 
 test('rejects a missing skin when the source has skinned meshes', () => {
   const json = makeJson();
+  delete json.nodes[0].skin;
   delete json.skins;
   assert.throws(() => inspectGlbContract(makeGlb(json), source), /no glTF skins/);
 });
