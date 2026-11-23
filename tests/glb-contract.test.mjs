@@ -67,7 +67,7 @@ test('reports meshes, skin joints, embedded images and morph targets', () => {
   assert.equal(report.skinJointCount, 2);
   assert.equal(report.embeddedImageCount, 1);
   assert.equal(report.morphTargetCount, 2);
-  assert.equal(report.readyForUnityImport, true);
+  assert.equal(report.structuralChecksPassed, true);
 });
 
 test('rejects a missing skin when the source has skinned meshes', () => {
