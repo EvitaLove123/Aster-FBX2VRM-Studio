@@ -4,8 +4,7 @@ const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 const TEXTURE_SLOTS = [
   'map', 'normalMap', 'roughnessMap', 'metalnessMap',
-  'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap',
-  'displacementMap', 'lightMap', 'envMap'
+  'emissiveMap', 'alphaMap', 'aoMap'
 ];
 
 export function parseGlbContainer(input) {
