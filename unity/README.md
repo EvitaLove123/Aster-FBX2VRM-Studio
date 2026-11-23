@@ -44,3 +44,20 @@ The build entry point currently creates a minimal scene so the CI pipeline can b
 ## Next implementation milestone
 
 Implement the runtime bridge and verify a small GLB round trip before adding the WebGL build to the public GitHub Pages site.
+
+
+## Android-first license setup
+
+The repository includes a separate **Request Unity Activation File** workflow so the activation request can be generated in GitHub Actions without installing Unity on the phone.
+
+1. Open the repository's **Actions** tab.
+2. Select **Request Unity Activation File** and run the workflow.
+3. Download the `unity-activation-request-2022.3.62f1` artifact on Android and extract the `.alf` file.
+4. Open the official Unity manual activation portal and submit the `.alf` file.
+5. If Unity offers a valid license for this account, download the `.ulf` file.
+6. In GitHub repository **Settings → Secrets and variables → Actions**, add `UNITY_LICENSE` with the full contents of the `.ulf` file, plus `UNITY_EMAIL` and `UNITY_PASSWORD` for the Unity account.
+7. Run **Unity WebGL Cloud Build** from the Actions tab.
+
+Important: Unity's current manual-activation support for Personal licenses has changed and may reject this flow or hide the Personal option. The activation-request workflow only creates the request file; it does not guarantee Unity will issue a Personal license. Never paste license files or Unity credentials into a chat, issue, commit, or pull request. If Unity refuses Personal manual activation, stop here rather than trying unofficial license workarounds.
+
+Official GameCI activation guidance: https://game.ci/docs/github/activation/
