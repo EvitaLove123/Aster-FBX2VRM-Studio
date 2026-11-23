@@ -521,6 +521,12 @@ $('rotateModel180').addEventListener('click', () => {
     : 'Original model direction restored. This orientation will be included in VRM export.';
 });
 async function loadFbxBuffer(buffer, fileName) {
+  if (window.asterGlbDownloadUrl) {
+    URL.revokeObjectURL(window.asterGlbDownloadUrl);
+    window.asterGlbDownloadUrl = null;
+  }
+  const previousGlbLink = $('glbDownloadFallback');
+  if (previousGlbLink) previousGlbLink.remove();
   $('empty').style.display = 'grid';
   $('exportVRM0').disabled = true;
   $('exportVRM1').disabled = true;
@@ -621,6 +627,7 @@ async function loadFbxBuffer(buffer, fileName) {
     $('materialCount').textContent = '—';
     $('boneCount').textContent = '—';
     $('details').textContent = 'Could not parse this FBX: ' + message;
+    $('handoffStatus').textContent = 'GLB handoff unavailable because FBX loading failed.';
     $('mappingStatus').textContent = 'FBX loading failed. Select another FBX or try again.';
     $('empty').style.display = 'grid';
     status('FBX load failed: ' + message.slice(0, 110), 'bad');
@@ -1127,7 +1134,7 @@ async function prepareGlbHandoff() {
     if (window.asterGlbDownloadUrl) URL.revokeObjectURL(window.asterGlbDownloadUrl);
     const url = URL.createObjectURL(result.blob);
     window.asterGlbDownloadUrl = url;
-    const baseName = ($('metaName').value.trim() || lastFbxName.replace(/\\.fbx$/i, '') || 'Aster_Avatar')
+    const baseName = ($('metaName').value.trim() || lastFbxName.replace(/\.fbx$/i, '') || 'Aster_Avatar')
       .replace(/[^a-z0-9_-]/gi, '_');
     const filename = baseName + '_Unity_Handoff.glb';
     let link = $('glbDownloadFallback');
