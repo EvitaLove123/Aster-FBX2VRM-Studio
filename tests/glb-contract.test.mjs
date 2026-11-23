@@ -134,3 +134,15 @@ test('rejects skin data that is not attached to a mesh node', () => {
   delete json.nodes[0].skin;
   assert.throws(() => inspectGlbContract(makeGlb(json), source), /no mesh node references a skin/);
 });
+
+test('rejects an out-of-range skin reference on a mesh node', () => {
+  const json = makeJson();
+  json.nodes[0].skin = 12;
+  assert.throws(() => inspectGlbContract(makeGlb(json), source), /invalid skin index/);
+});
+
+test('rejects a reduced morph target count', () => {
+  const json = makeJson();
+  json.meshes[0].primitives[0].targets = [{ POSITION: 3 }];
+  assert.throws(() => inspectGlbContract(makeGlb(json), source), /fewer morph targets/);
+});
