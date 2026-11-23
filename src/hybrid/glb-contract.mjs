@@ -237,6 +237,7 @@ export function inspectGlbContract(input, source = {}) {
     morphTargetCount,
     source,
     warnings,
-    readyForUnityImport: warnings.length === 0
+    structuralChecksPassed: warnings.length === 0,
+    validationScope: 'GLB container and source-preservation preflight only; no Unity or UniVRM import is performed'
   };
 }
