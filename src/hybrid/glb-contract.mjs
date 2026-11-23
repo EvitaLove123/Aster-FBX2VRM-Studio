@@ -148,8 +148,8 @@ export function inspectGlbContract(input, source = {}) {
 
   if (nodes.length === 0) throw new Error('The GLB contains no nodes.');
   if (meshes.length === 0) throw new Error('The GLB contains no meshes.');
-  if (binaryByteLength === 0 || buffers.length === 0) {
-    throw new Error('The GLB binary buffer is missing.');
+  if (binaryByteLength === 0 || buffers.length !== 1) {
+    throw new Error('The GLB handoff must contain exactly one embedded binary buffer.');
   }
 
   const buffer = buffers[0];
@@ -160,8 +160,12 @@ export function inspectGlbContract(input, source = {}) {
   }
 
   const warnings = [];
+  const skinnedNodeCount = nodes.filter((node) => Number.isInteger(node.skin)).length;
   if ((source.skinnedMeshCount || 0) > 0 && skins.length === 0) {
     throw new Error('The source contains skinned meshes, but the GLB contains no glTF skins.');
+  }
+  if ((source.skinnedMeshCount || 0) > 0 && skinnedNodeCount === 0) {
+    throw new Error('The GLB contains skin data, but no mesh node references a skin.');
   }
 
   let morphTargetPrimitiveCount = 0;
@@ -210,6 +214,7 @@ export function inspectGlbContract(input, source = {}) {
     nodeCount: nodes.length,
     meshCount: meshes.length,
     skinCount: skins.length,
+    skinnedNodeCount,
     skinJointCount,
     materialCount: materials.length,
     imageCount: images.length,
