@@ -31,9 +31,18 @@ The Unity WebGL module is a planned component and is **not present in this repos
 - Material preview controls and VRM metadata inputs.
 - Experimental VRM 0.x and VRM 1.0 JavaScript export paths with three-vrm read-back inspection.
 
+## Browser GLB handoff (implemented)
+
+- `src/hybrid/glb-handoff.mjs` uses Three.js GLTFExporter to create a local binary GLB intermediate from the prepared avatar.
+- `src/hybrid/glb-contract.mjs` checks the GLB 2.0 header/chunks, binary buffer length, mesh presence, skin joint references, morph targets and embedded images.
+- The Export step exposes **Prepare GLB for Unity WebGL** and downloads the intermediate file locally.
+- The handoff preflight fails when source skinned meshes, morph targets or textures are lost during GLB serialization. It reports external image URIs and suspicious mesh-count reductions as warnings.
+- Run dependency-free contract tests with `node --test tests/glb-contract.test.mjs`.
+
+This is a GLB handoff milestone only. It does **not** import the GLB into Unity, invoke UniGLTF/UniVRM, or produce a genuine UniVRM-exported VRM.
+
 ## Not yet implemented in the target Hybrid pipeline
 
-- FBX-to-GLB handoff contract for the Unity WebGL module.
 - Unity project and reproducible WebGL build using pinned Unity, UniGLTF and UniVRM versions.
 - Runtime GLB import and VRM 0.x / VRM 1.0 export through UniVRM.
 - Transfer of VRM bytes, progress, cancellation and structured validation results between Unity WebGL and the browser.
