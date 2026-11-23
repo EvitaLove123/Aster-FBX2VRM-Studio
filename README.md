@@ -48,6 +48,29 @@ This is a GLB handoff milestone only. It does **not** import the GLB into Unity,
 - Transfer of VRM bytes, progress, cancellation and structured validation results between Unity WebGL and the browser.
 - End-to-end validation of mesh, textures, skin weights, skeleton, morph targets, expressions, spring bones and colliders in target apps.
 
+## UniVRM integration baseline (research only)
+
+The official UniVRM repository currently lists **v0.131.4** as its latest release observed on 2026-11-23. Its release notes support Unity 2022.3 LTS or later. Since v0.131.0, the UPM package paths are under `/Packages`.
+
+Candidate pinned package URLs (not installed in this repository yet):
+
+- `com.vrmc.gltf`: `https://github.com/vrm-c/UniVRM.git?path=/Packages/UniGLTF#v0.131.4`
+- `com.vrmc.univrm` (VRM 0.x): `https://github.com/vrm-c/UniVRM.git?path=/Packages/VRM#v0.131.4`
+- `com.vrmc.vrm` (VRM 1.0): `https://github.com/vrm-c/UniVRM.git?path=/Packages/VRM10#v0.131.4`
+
+The official project documents runtime import/export and WebGL as a supported target. Runtime GLB byte import is available through UniGLTF's `GltfUtility.LoadBytesAsync`; VRM 1.0 also provides `Vrm10.LoadBytesAsync`. Official runtime export samples exist for both the legacy VRM 0.x exporter and VRM 1.0.
+
+This is a version/API research baseline, **not a built or validated Unity WebGL module**. Before adding the Unity project, verify the chosen Unity patch version, WebGL player settings, package resolution, runtime memory behavior and both export paths in CI. A current upstream issue also questions whether the VRM 1.0 runtime exporter bakes current blendshape weights; preserve morph targets rather than assuming this behavior.
+
+References:
+
+- [UniVRM v0.131.4 release and package URLs](https://github.com/vrm-c/UniVRM/releases)
+- [UniVRM runtime GLB import API](https://vrm.dev/en/api/runtime-import/UniGLTF_GltfUtility/)
+- [UniVRM runtime VRM 1.0 import API](https://vrm.dev/en/api/runtime-import/UniVRM10_Vrm10/)
+- [Official VRM 0.x runtime exporter sample](https://github.com/vrm-c/UniVRM/blob/master/Packages/VRM/Samples~/RuntimeExporterSample/VRMRuntimeExporter.cs)
+- [Official VRM 1.0 runtime exporter sample](https://github.com/vrm-c/UniVRM/blob/master/Packages/VRM10/Runtime/Scenes/Sample.cs)
+- [Runtime VRM 1.0 blendshape export issue](https://github.com/vrm-c/UniVRM/issues/2805)
+
 ## Android and memory-safety rules
 
 - Keep model processing local in the browser.
