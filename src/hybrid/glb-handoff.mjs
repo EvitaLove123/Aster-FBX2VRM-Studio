@@ -24,9 +24,6 @@ export async function exportPreparedAvatarGlb(root, options = {}) {
   }
 
   const report = inspectGlbContract(arrayBuffer, source);
-  return {
-    arrayBuffer,
-    blob: new Blob([arrayBuffer], { type: 'model/gltf-binary' }),
-    report
-  };
+  const blob = new Blob([arrayBuffer], { type: 'model/gltf-binary' });
+  return { blob, report };
 }
